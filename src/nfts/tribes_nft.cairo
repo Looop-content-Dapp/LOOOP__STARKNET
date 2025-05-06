@@ -63,17 +63,12 @@ pub mod TribesNFT {
 
     #[constructor]
     fn constructor(
-        ref self: ContractState,
-        pauser: ContractAddress,
-        minter: ContractAddress,
-        name: ByteArray,
-        symbol: ByteArray
+        ref self: ContractState, pauser: ContractAddress, name: ByteArray, symbol: ByteArray
     ) {
         self.erc721.initializer(name, symbol, "");
         self.accesscontrol.initializer();
 
         self.accesscontrol._grant_role(PAUSER_ROLE, pauser);
-        self.accesscontrol._grant_role(MINTER_ROLE, minter);
     }
 
     impl ERC721HooksImpl of ERC721Component::ERC721HooksTrait<ContractState> {

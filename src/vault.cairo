@@ -30,7 +30,6 @@ pub mod Vault {
         protocol_vault: ContractAddress,
         payment_token: ContractAddress,
         tribe_details: Map<ContractAddress, TribeDetails>,
-        user_payment_ids: Map<ContractAddress, Vec<u256>>,
         user_pass_details: Map<ContractAddress, PassDetails>,
         pass_validity_details: Map<u32, TribePassValidity>,
         artist_details: Map<ContractAddress, ArtistDetails>,
@@ -158,16 +157,11 @@ pub mod Vault {
 
     #[abi(embed_v0)]
     impl IVaultImpl of IVault<ContractState> {
-        /// HIGH ALERT: You need a means to validate offchain payment
         fn mint_pass(
-            ref self: ContractState,
-            artist: ContractAddress,
-            tribe_nft_address: ContractAddress,
-            payment_id: u256
+            ref self: ContractState, artist: ContractAddress, tribe_nft_address: ContractAddress
         ) {
             let caller = get_caller_address();
             let payment_token = self.payment_token.read();
-            let protocol_vault = self.protocol_vault.read();
             let factory = self.factory_address.read();
             let artist_detail = self.artist_details.entry(artist).read();
             let tribe: TribeDetails = self.tribe_details.entry(tribe_nft_address).read();
@@ -185,9 +179,9 @@ pub mod Vault {
 
             let artist_royalty = self.calculate_percentage(pass_cost, artist_percentage);
             /// @notice Transfers token from protocol vault to artist 70%
-            token_dispatcher.transfer_from(protocol_vault, payment_address, artist_royalty);
+            token_dispatcher.transfer_from(caller, payment_address, artist_royalty);
             /// @notice Transfers token from protocol vault to factory contract 30%
-            token_dispatcher.transfer_from(protocol_vault, factory, pass_cost - artist_royalty);
+            token_dispatcher.transfer_from(caller, factory, pass_cost - artist_royalty);
 
             let pass_expiry = get_block_timestamp() + pass_duration;
             // let grace_period_end_time = pass_expiry + grace_period;
@@ -216,7 +210,6 @@ pub mod Vault {
                 artist, total_royalties_earned, total_passes, active_passes
             };
 
-            self.user_payment_ids.entry(caller).append().write(payment_id);
             self.pass_validity_details.entry(tribe_id).write(tribe_pass_validity);
             self.user_pass_details.entry(caller).write(pass_details);
             self.artist_details.entry(artist).write(new_artist_detail);
@@ -227,13 +220,9 @@ pub mod Vault {
             self.emit(PassMinted { owner: caller, token_id: tribe_id });
         }
 
-        /// HIGH ALERT: You need a means to validate offchain payment
-        fn renew_pass(
-            ref self: ContractState, tribe_nft_address: ContractAddress, payment_id: u256
-        ) {
+        fn renew_pass(ref self: ContractState, tribe_nft_address: ContractAddress) {
             let caller = get_caller_address();
             let payment_token = self.payment_token.read();
-            let protocol_vault = self.protocol_vault.read();
             let factory = self.factory_address.read();
             let pass_detail = self.user_pass_details.entry(caller).read();
             let tribe: TribeDetails = self.tribe_details.entry(tribe_nft_address).read();
@@ -254,9 +243,9 @@ pub mod Vault {
 
             let artist_royalty = self.calculate_percentage(pass_cost, artist_percentage);
             /// @notice Transfers token from protocol vault to artist 70%
-            token_dispatcher.transfer_from(protocol_vault, payment_address, artist_royalty);
+            token_dispatcher.transfer_from(caller, payment_address, artist_royalty);
             /// @notice Transfers token from protocol vault to factory contract 30%
-            token_dispatcher.transfer_from(protocol_vault, factory, pass_cost - artist_royalty);
+            token_dispatcher.transfer_from(caller, factory, pass_cost - artist_royalty);
 
             let pass_validity: TribePassValidity = self.check_pass_validity(tribe_id);
 
@@ -291,7 +280,6 @@ pub mod Vault {
                 artist, total_royalties_earned, total_passes, active_passes
             };
 
-            self.user_payment_ids.entry(caller).append().write(payment_id);
             self.pass_validity_details.entry(tribe_id).write(tribe_pass_validity);
             self.user_pass_details.entry(caller).write(pass_details);
             self.artist_details.entry(artist).write(new_artist_detail);
