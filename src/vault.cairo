@@ -41,42 +41,42 @@ pub mod Vault {
 
     #[derive(Clone, Drop, Serde, starknet::Store)]
     pub struct TribeDetails {
-        tribe_id: u32,
-        artist: ContractAddress,
-        tribe_nft_address: ContractAddress,
-        pass_cost: u256,
-        pass_duration: u64,
-        grace_period: u64,
-        payment_address: ContractAddress,
-        house_percentage: u32,
-        artist_percentage: u32,
+        pub tribe_id: u32,
+        pub artist: ContractAddress,
+        pub tribe_nft_address: ContractAddress,
+        pub pass_cost: u256,
+        pub pass_duration: u64,
+        pub grace_period: u64,
+        pub payment_address: ContractAddress,
+        pub house_percentage: u32,
+        pub artist_percentage: u32,
     }
 
     #[derive(Drop, Serde, starknet::Store)]
     pub struct TribePassValidity {
-        tribe_id: u32,
-        is_valid: bool,
-        expires_at: u64,
-        grace_period: u64,
-        in_grace_period: bool,
-        grace_period_end: bool
+        pub tribe_id: u32,
+        pub is_valid: bool,
+        pub expires_at: u64,
+        pub grace_period: u64,
+        pub in_grace_period: bool,
+        pub grace_period_end: bool
     }
 
     #[derive(Drop, Serde, starknet::Store)]
     pub struct PassDetails {
-        tribe_nft_address: ContractAddress,
-        token_id: u256,
-        owner: ContractAddress,
-        is_valid: bool,
-        expires_at: u64
+        pub tribe_nft_address: ContractAddress,
+        pub token_id: u256,
+        pub owner: ContractAddress,
+        pub is_valid: bool,
+        pub expires_at: u64
     }
 
     #[derive(Drop, Serde, starknet::Store)]
     pub struct ArtistDetails {
-        artist: ContractAddress,
-        total_royalties_earned: u256,
-        total_passes: u64,
-        active_passes: u64
+        pub artist: ContractAddress,
+        pub total_royalties_earned: u256,
+        pub total_passes: u64,
+        pub active_passes: u64
     }
 
     #[derive(Drop, Serde)]
@@ -288,26 +288,25 @@ pub mod Vault {
         }
 
 
-        fn burn_expired_pass(ref self: ContractState, token_id: u32) {
-            let caller = get_caller_address();
-            let pass_validity = self.check_pass_validity(token_id);
-            assert(pass_validity.expires_at >= get_block_timestamp(), 'pass still valid');
-            assert(
-                pass_validity.grace_period + pass_validity.expires_at >= get_block_timestamp(),
-                'pass still in grace period'
-            );
+        fn burn_expired_pass(ref self: ContractState, token_id: u32, user: ContractAddress) {
+            self.ownable.assert_only_owner();
+            let pass_validity = self.check_pass_status(user, token_id);
+            let pass_detail = self.user_pass_details.entry(user).read();
 
-            let pass_detail = self.user_pass_details.entry(caller).read();
+            assert!(!pass_validity, "pass still valid or in grace period");
+            assert(pass_detail.owner == user, 'user not found');
+
             let tribe_nft_dispatcher = IERC721Dispatcher {
                 contract_address: pass_detail.tribe_nft_address
             };
 
-            tribe_nft_dispatcher.burn(token_id.into());
+            tribe_nft_dispatcher.burn_nft(token_id.into());
 
             self.emit(PassBurned { token_id });
         }
 
-        fn check_pass_status(self: @ContractState, token_id: u32) -> PassStatus {
+        fn check_pass_status(self: @ContractState, user: ContractAddress, token_id: u32) -> bool {
+            let mut is_valid = false;
             let pass_validity_detail: TribePassValidity = self
                 .pass_validity_details
                 .entry(token_id)
@@ -316,17 +315,15 @@ pub mod Vault {
             let grace_period = pass_validity_detail.grace_period;
             let current_time = get_block_timestamp();
 
-            if current_time < pass_expiry {
-                PassStatus::Active
-            } else if current_time > pass_expiry && current_time < pass_expiry + grace_period {
-                PassStatus::InGracePeriod
-            } else {
-                PassStatus::Expired
-            }
+            if current_time < (pass_expiry + grace_period) {
+                is_valid = true;
+            };
+
+            is_valid
         }
 
 
-        fn check_validity(self: @ContractState, token_id: u32) -> TribePassValidity {
+        fn get_validity(self: @ContractState, token_id: u32) -> TribePassValidity {
             self.pass_validity_details.entry(token_id).read()
         }
 

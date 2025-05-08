@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MIT
-// Compatible with OpenZeppelin Contracts for Cairo ^0.14.0
 
 const PAUSER_ROLE: felt252 = selector!("PAUSER_ROLE");
 const MINTER_ROLE: felt252 = selector!("MINTER_ROLE");
@@ -14,6 +12,7 @@ pub mod TribesNFT {
     use openzeppelin::security::pausable::PausableComponent;
     use openzeppelin::token::erc721::ERC721Component;
     use super::{PAUSER_ROLE, MINTER_ROLE};
+    use loop_starknet::interfaces::IERC721;
 
     component!(path: ERC721Component, storage: erc721, event: ERC721Event);
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
@@ -90,6 +89,22 @@ pub mod TribesNFT {
         ) {}
     }
 
+    // Implement the IERC721 interface
+    #[abi(embed_v0)]
+    impl IERC721Impl of IERC721<ContractState> {
+        fn burn_nft(ref self: ContractState, token_id: u256) {
+            self.erc721.update(Zero::zero(), token_id, get_caller_address());
+        }
+
+        fn mint_ticket_nft(ref self: ContractState, recipient: ContractAddress, token_id: u256) {
+            let balance = self.erc721.balance_of(recipient);
+            assert(balance.is_zero(), 'ALREADY_MINTED');
+
+            self._mint(recipient, token_id);
+        }
+    }
+
+    // Additional functions not part of the IERC721 interface
     #[generate_trait]
     #[abi(per_item)]
     impl ExternalImpl of ExternalTrait {
@@ -106,13 +121,8 @@ pub mod TribesNFT {
         }
 
         #[external(v0)]
-        fn burn(ref self: ContractState, token_id: u256) {
-            self.erc721.update(Zero::zero(), token_id, get_caller_address());
-        }
-
-        #[external(v0)]
         fn _mint(ref self: ContractState, recipient: ContractAddress, token_id: u256,) {
-            self.accesscontrol.assert_only_role(MINTER_ROLE);
+            // self.accesscontrol.assert_only_role(MINTER_ROLE);
             self.erc721.mint(recipient, token_id);
         }
 
@@ -125,49 +135,6 @@ pub mod TribesNFT {
         ) {
             self.accesscontrol.assert_only_role(MINTER_ROLE);
             self.erc721.safe_mint(recipient, token_id, data);
-        }
-
-        // #[external(v0)]
-        // fn transfer_from(ref self: ContractState) {
-        //     panic!("Token not meant to be transferred");
-        // }
-
-        // #[external(v0)]
-        // fn transferFrom(ref self: ContractState) {
-        //     panic!("Token not meant to be transferred");
-        // }
-
-        // #[external(v0)]
-        // fn safe_transfer_from(ref self: ContractState) {
-        //     panic!("Token not meant to be transferred");
-        // }
-
-        // #[external(v0)]
-        // fn safeTransferFrom(ref self: ContractState) {
-        //     panic!("Token not meant to be transferred");
-        // }
-
-        // #[external(v0)]
-        // fn approve(ref self: ContractState) {
-        //     panic!("Token not meant to be transferred");
-        // }
-
-        // #[external(v0)]
-        // fn set_approval_for_all(ref self: ContractState) {
-        //     panic!("Token not meant to be transferred");
-        // }
-
-        // #[external(v0)]
-        // fn setApprovalForAll(ref self: ContractState) {
-        //     panic!("Token not meant to be transferred");
-        // }
-
-        #[external(v0)]
-        fn mint_tribes_nft(ref self: ContractState, recipient: ContractAddress, token_id: u256) {
-            let balance = self.erc721.balance_of(recipient);
-            assert(balance.is_zero(), 'ALREADY_MINTED');
-
-            self._mint(recipient, token_id);
         }
     }
 }
