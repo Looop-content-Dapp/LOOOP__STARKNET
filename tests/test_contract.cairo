@@ -13,8 +13,10 @@ use loop_starknet::vault::Vault::PassStatus;
 use loop_starknet::nfts::tribes_nft::TribesNFT;
 use loop_starknet::interfaces::{
     ITribesFactoryDispatcher, ITribesFactoryDispatcherTrait, IVaultDispatcher,
-    IVaultDispatcherTrait, IUSDCTokenDispatcher, IUSDCTokenDispatcherTrait, IERC721Dispatcher, IERC721DispatcherTrait
+    IVaultDispatcherTrait, IUSDCTokenDispatcher, IUSDCTokenDispatcherTrait, IERC721Dispatcher,
+    IERC721DispatcherTrait
 };
+
 
 fn deploy_token() -> ContractAddress {
     let owner = contract_address_const::<'owner'>();
@@ -170,7 +172,7 @@ fn test_update_royalties() {
 fn test_update_royalties_should_panic() {
     // Setup
     let factory_address = deploy_factory_contract();
-    let owner = contract_address_const::<'owner'>();
+    let _owner = contract_address_const::<'owner'>();
     let factory_dispatcher = ITribesFactoryDispatcher { contract_address: factory_address };
 
     // Update royalties
@@ -407,7 +409,8 @@ fn test_symbol_should_panic() {
 }
 
 #[test]
-fn test_mint_pass() {
+#[should_panic(expected: 'Not Whitelisted')]
+fn test_mint_pass_without_been_whitelisted() {
     let pauser = contract_address_const::<'pauser'>();
     let user = contract_address_const::<'user'>();
     let owner = contract_address_const::<'owner'>();
@@ -462,10 +465,207 @@ fn test_mint_pass() {
 
     let balance_of_artist = token_dispatcher.balance_of(payment_address);
     assert!(balance_of_artist == 7000, "Inaccurate artist bal");
-    
+
     let balance_of_factory = token_dispatcher.balance_of(factory_address);
     assert!(balance_of_factory == 3000, "Inaccurate platform bal");
-} 
+}
+#[test]
+fn test_mint_pass() {
+    let pauser = contract_address_const::<'pauser'>();
+    let user = contract_address_const::<'user'>();
+    let owner = contract_address_const::<'owner'>();
+    let name = "TestCollection";
+    let symbol = "TEST";
+    let duration: u64 = 1746461445 + 86400;
+    let grace_period: u64 = duration + 3600;
+    let passcost: u256 = 10000_u256;
+    let payment_address = contract_address_const::<'payment_address'>();
+    let collection_details: ByteArray = "Test collection description";
+
+    let factory_address = deploy_factory_contract();
+    let USDC_address = deploy_token();
+
+    let factory_dispatcher = ITribesFactoryDispatcher { contract_address: factory_address };
+
+    start_cheat_caller_address(factory_address, owner);
+    factory_dispatcher.add_supported_token(USDC_address);
+    stop_cheat_caller_address(factory_address);
+
+    start_cheat_caller_address(factory_address, pauser);
+    let (tribes_nft_address, vault_address) = factory_dispatcher
+        .create_collection(
+            pauser,
+            name,
+            symbol,
+            duration,
+            grace_period,
+            passcost,
+            payment_address,
+            USDC_address,
+            collection_details,
+        );
+    stop_cheat_caller_address(factory_address);
+
+    let token_dispatcher = IUSDCTokenDispatcher { contract_address: USDC_address };
+    let amount: u256 = 1_000_000_u256;
+
+    let vault_dispatcher = IVaultDispatcher { contract_address: vault_address };
+
+    start_cheat_caller_address(USDC_address, owner);
+    token_dispatcher.transfer(user, amount);
+    stop_cheat_caller_address(USDC_address);
+
+    start_cheat_caller_address(USDC_address, user);
+    token_dispatcher.approve(vault_address, amount);
+    stop_cheat_caller_address(USDC_address);
+
+    let nft_dispatcher = IERC721Dispatcher { contract_address: tribes_nft_address };
+    start_cheat_caller_address(tribes_nft_address, pauser);
+    nft_dispatcher.whitelist_address(user);
+
+    start_cheat_caller_address(vault_address, user);
+    vault_dispatcher.mint_pass(pauser, tribes_nft_address);
+    stop_cheat_caller_address(vault_address);
+
+    let balance_of_artist = token_dispatcher.balance_of(payment_address);
+    assert!(balance_of_artist == 7000, "Inaccurate artist bal");
+
+    let balance_of_factory = token_dispatcher.balance_of(factory_address);
+    assert!(balance_of_factory == 3000, "Inaccurate platform bal");
+}
+#[test]
+#[should_panic(expected: 'Pausable: paused')]
+fn test_mint_pass_when_paused() {
+    let pauser = contract_address_const::<'pauser'>();
+    let user = contract_address_const::<'user'>();
+    let owner = contract_address_const::<'owner'>();
+    let name = "TestCollection";
+    let symbol = "TEST";
+    let duration: u64 = 1746461445 + 86400;
+    let grace_period: u64 = duration + 3600;
+    let passcost: u256 = 10000_u256;
+    let payment_address = contract_address_const::<'payment_address'>();
+    let collection_details: ByteArray = "Test collection description";
+
+    let factory_address = deploy_factory_contract();
+    let USDC_address = deploy_token();
+
+    let factory_dispatcher = ITribesFactoryDispatcher { contract_address: factory_address };
+
+    start_cheat_caller_address(factory_address, owner);
+    factory_dispatcher.add_supported_token(USDC_address);
+    stop_cheat_caller_address(factory_address);
+
+    start_cheat_caller_address(factory_address, pauser);
+    let (tribes_nft_address, vault_address) = factory_dispatcher
+        .create_collection(
+            pauser,
+            name,
+            symbol,
+            duration,
+            grace_period,
+            passcost,
+            payment_address,
+            USDC_address,
+            collection_details,
+        );
+    stop_cheat_caller_address(factory_address);
+
+    let token_dispatcher = IUSDCTokenDispatcher { contract_address: USDC_address };
+    let amount: u256 = 1_000_000_u256;
+
+    let vault_dispatcher = IVaultDispatcher { contract_address: vault_address };
+
+    start_cheat_caller_address(USDC_address, owner);
+    token_dispatcher.transfer(user, amount);
+    stop_cheat_caller_address(USDC_address);
+
+    start_cheat_caller_address(USDC_address, user);
+    token_dispatcher.approve(vault_address, amount);
+    stop_cheat_caller_address(USDC_address);
+
+    let nft_dispatcher = IERC721Dispatcher { contract_address: tribes_nft_address };
+    start_cheat_caller_address(tribes_nft_address, pauser);
+    nft_dispatcher.whitelist_address(user);
+    nft_dispatcher.pause();
+
+    start_cheat_caller_address(vault_address, user);
+    vault_dispatcher.mint_pass(pauser, tribes_nft_address);
+    stop_cheat_caller_address(vault_address);
+
+    let balance_of_artist = token_dispatcher.balance_of(payment_address);
+    assert!(balance_of_artist == 7000, "Inaccurate artist bal");
+
+    let balance_of_factory = token_dispatcher.balance_of(factory_address);
+    assert!(balance_of_factory == 3000, "Inaccurate platform bal");
+}
+
+#[test]
+fn test_mint_pass_when_unpaused() {
+    let pauser = contract_address_const::<'pauser'>();
+    let user = contract_address_const::<'user'>();
+    let owner = contract_address_const::<'owner'>();
+    let name = "TestCollection";
+    let symbol = "TEST";
+    let duration: u64 = 1746461445 + 86400;
+    let grace_period: u64 = duration + 3600;
+    let passcost: u256 = 10000_u256;
+    let payment_address = contract_address_const::<'payment_address'>();
+    let collection_details: ByteArray = "Test collection description";
+
+    let factory_address = deploy_factory_contract();
+    let USDC_address = deploy_token();
+
+    let factory_dispatcher = ITribesFactoryDispatcher { contract_address: factory_address };
+
+    start_cheat_caller_address(factory_address, owner);
+    factory_dispatcher.add_supported_token(USDC_address);
+    stop_cheat_caller_address(factory_address);
+
+    start_cheat_caller_address(factory_address, pauser);
+    let (tribes_nft_address, vault_address) = factory_dispatcher
+        .create_collection(
+            pauser,
+            name,
+            symbol,
+            duration,
+            grace_period,
+            passcost,
+            payment_address,
+            USDC_address,
+            collection_details,
+        );
+    stop_cheat_caller_address(factory_address);
+
+    let token_dispatcher = IUSDCTokenDispatcher { contract_address: USDC_address };
+    let amount: u256 = 1_000_000_u256;
+
+    let vault_dispatcher = IVaultDispatcher { contract_address: vault_address };
+
+    start_cheat_caller_address(USDC_address, owner);
+    token_dispatcher.transfer(user, amount);
+    stop_cheat_caller_address(USDC_address);
+
+    start_cheat_caller_address(USDC_address, user);
+    token_dispatcher.approve(vault_address, amount);
+    stop_cheat_caller_address(USDC_address);
+
+    let nft_dispatcher = IERC721Dispatcher { contract_address: tribes_nft_address };
+    start_cheat_caller_address(tribes_nft_address, pauser);
+    nft_dispatcher.whitelist_address(user);
+    nft_dispatcher.pause();
+    nft_dispatcher.unpause();
+
+    start_cheat_caller_address(vault_address, user);
+    vault_dispatcher.mint_pass(pauser, tribes_nft_address);
+    stop_cheat_caller_address(vault_address);
+
+    let balance_of_artist = token_dispatcher.balance_of(payment_address);
+    assert!(balance_of_artist == 7000, "Inaccurate artist bal");
+
+    let balance_of_factory = token_dispatcher.balance_of(factory_address);
+    assert!(balance_of_factory == 3000, "Inaccurate platform bal");
+}
 
 
 #[test]
@@ -480,18 +680,18 @@ fn test_renew_pass() {
     let passcost: u256 = 10000_u256;
     let payment_address = contract_address_const::<'payment_address'>();
     let collection_details: ByteArray = "Test collection description";
-    
+
     // Deploy contracts
     let factory_address = deploy_factory_contract();
     let USDC_address = deploy_token();
-    
+
     let factory_dispatcher = ITribesFactoryDispatcher { contract_address: factory_address };
-    
+
     // Add supported token
     start_cheat_caller_address(factory_address, owner);
     factory_dispatcher.add_supported_token(USDC_address);
     stop_cheat_caller_address(factory_address);
-    
+
     // Create collection
     start_cheat_caller_address(factory_address, pauser);
     let (tribes_nft_address, vault_address) = factory_dispatcher
@@ -507,62 +707,62 @@ fn test_renew_pass() {
             collection_details,
         );
     stop_cheat_caller_address(factory_address);
-    
+
     let token_dispatcher = IUSDCTokenDispatcher { contract_address: USDC_address };
     let vault_dispatcher = IVaultDispatcher { contract_address: vault_address };
-    
+
     // Give user tokens and approve them for vault
     let amount: u256 = 1_000_000_u256;
     start_cheat_caller_address(USDC_address, owner);
     token_dispatcher.transfer(user, amount);
     stop_cheat_caller_address(USDC_address);
-    
+
     start_cheat_caller_address(USDC_address, user);
     token_dispatcher.approve(vault_address, amount);
     stop_cheat_caller_address(USDC_address);
-    
+
+    let nft_dispatcher = IERC721Dispatcher { contract_address: tribes_nft_address };
+    start_cheat_caller_address(tribes_nft_address, pauser);
+    nft_dispatcher.whitelist_address(user);
     // First mint a pass
     start_cheat_caller_address(vault_address, user);
     vault_dispatcher.mint_pass(pauser, tribes_nft_address);
     stop_cheat_caller_address(vault_address);
-    
+
     // Record balances after first mint
     let artist_balance_after_mint = token_dispatcher.balance_of(payment_address);
     let factory_balance_after_mint = token_dispatcher.balance_of(factory_address);
-    
+
     // Now renew the pass
     start_cheat_caller_address(vault_address, user);
     vault_dispatcher.renew_pass(tribes_nft_address);
     stop_cheat_caller_address(vault_address);
-    
+
     // Check balances after renewal
     let artist_balance_after_renewal = token_dispatcher.balance_of(payment_address);
     let factory_balance_after_renewal = token_dispatcher.balance_of(factory_address);
-    
+
     // Verify artist received additional 70% of pass cost
     assert!(
-        artist_balance_after_renewal == artist_balance_after_mint + 7000, 
+        artist_balance_after_renewal == artist_balance_after_mint + 7000,
         "Artist did not receive correct renewal payment"
     );
-    
+
     // Verify factory received additional 30% of pass cost
     assert!(
         factory_balance_after_renewal == factory_balance_after_mint + 3000,
         "Factory did not receive correct renewal fee"
     );
-    
+
     // Check pass validity after renewal
     let user_pass = vault_dispatcher.get_user_pass(user);
     assert!(user_pass.is_valid, "Pass should be valid after renewal");
-    
+
     // Check artist stats were updated
     let artist_info = vault_dispatcher.get_artist_info(pauser);
     assert!(artist_info.total_passes == 2, "Artist total passes not updated correctly");
     assert!(artist_info.active_passes == 2, "Artist active passes not updated correctly");
-    assert!(
-        artist_info.total_royalties_earned == 14000, 
-        "Artist royalties not updated correctly"
-    );
+    assert!(artist_info.total_royalties_earned == 14000, "Artist royalties not updated correctly");
 }
 
 
@@ -579,18 +779,18 @@ fn test_renew_pass_should_panic_user_not_found() {
     let passcost: u256 = 10000_u256;
     let payment_address = contract_address_const::<'payment_address'>();
     let collection_details: ByteArray = "Test collection description";
-    
+
     // Deploy contracts
     let factory_address = deploy_factory_contract();
     let USDC_address = deploy_token();
-    
+
     let factory_dispatcher = ITribesFactoryDispatcher { contract_address: factory_address };
-    
+
     // Add supported token
     start_cheat_caller_address(factory_address, owner);
     factory_dispatcher.add_supported_token(USDC_address);
     stop_cheat_caller_address(factory_address);
-    
+
     // Create collection
     start_cheat_caller_address(factory_address, pauser);
     let (tribes_nft_address, vault_address) = factory_dispatcher
@@ -606,32 +806,34 @@ fn test_renew_pass_should_panic_user_not_found() {
             collection_details,
         );
     stop_cheat_caller_address(factory_address);
-    
+
     let token_dispatcher = IUSDCTokenDispatcher { contract_address: USDC_address };
     let vault_dispatcher = IVaultDispatcher { contract_address: vault_address };
-    
+
     // Give user tokens and approve them for vault
     let amount: u256 = 1_000_000_u256;
     start_cheat_caller_address(USDC_address, owner);
     token_dispatcher.transfer(user, amount);
     stop_cheat_caller_address(USDC_address);
-    
+
     start_cheat_caller_address(USDC_address, user);
     token_dispatcher.approve(vault_address, amount);
     stop_cheat_caller_address(USDC_address);
-    
+
+    let nft_dispatcher = IERC721Dispatcher { contract_address: tribes_nft_address };
+    start_cheat_caller_address(tribes_nft_address, pauser);
+    nft_dispatcher.whitelist_address(user);
     // First mint a pass
     start_cheat_caller_address(vault_address, user);
     vault_dispatcher.mint_pass(pauser, tribes_nft_address);
     stop_cheat_caller_address(vault_address);
-    
+
     // Record balances after first mint
-    let artist_balance_after_mint = token_dispatcher.balance_of(payment_address);
-    let factory_balance_after_mint = token_dispatcher.balance_of(factory_address);
-    
+    let _artist_balance_after_mint = token_dispatcher.balance_of(payment_address);
+    let _factory_balance_after_mint = token_dispatcher.balance_of(factory_address);
+
     // Now renew the pass by guest user
     vault_dispatcher.renew_pass(tribes_nft_address);
-    
 }
 
 
@@ -648,18 +850,18 @@ fn test_check_pass_status() {
     let passcost: u256 = 10000_u256;
     let payment_address = contract_address_const::<'payment_address'>();
     let collection_details: ByteArray = "Test collection description";
-    
+
     // Deploy contracts
     let factory_address = deploy_factory_contract();
     let USDC_address = deploy_token();
-    
+
     let factory_dispatcher = ITribesFactoryDispatcher { contract_address: factory_address };
-    
+
     // Add supported token
     start_cheat_caller_address(factory_address, owner);
     factory_dispatcher.add_supported_token(USDC_address);
     stop_cheat_caller_address(factory_address);
-    
+
     // Create collection
     start_cheat_caller_address(factory_address, pauser);
     let (tribes_nft_address, vault_address) = factory_dispatcher
@@ -675,47 +877,49 @@ fn test_check_pass_status() {
             collection_details,
         );
     stop_cheat_caller_address(factory_address);
-    
+
     let token_dispatcher = IUSDCTokenDispatcher { contract_address: USDC_address };
     let vault_dispatcher = IVaultDispatcher { contract_address: vault_address };
-    
+
     // Give user tokens and approve them for vault
     let amount: u256 = 1_000_000_u256;
     start_cheat_caller_address(USDC_address, owner);
     token_dispatcher.transfer(user, amount);
     stop_cheat_caller_address(USDC_address);
-    
+
     start_cheat_caller_address(USDC_address, user);
     token_dispatcher.approve(vault_address, amount);
     stop_cheat_caller_address(USDC_address);
-    
+
+    let nft_dispatcher = IERC721Dispatcher { contract_address: tribes_nft_address };
+    start_cheat_caller_address(tribes_nft_address, pauser);
+    nft_dispatcher.whitelist_address(user);
     // Mint a pass
     start_cheat_caller_address(vault_address, user);
     vault_dispatcher.mint_pass(pauser, tribes_nft_address);
     stop_cheat_caller_address(vault_address);
-    
+
     // Get tribe details to get tribe ID
     let tribe_details = vault_dispatcher.get_tribe_info(tribes_nft_address);
     let tribe_id = tribe_details.tribe_id;
-    
+
     // Check initial status (should be Active)
     let status = vault_dispatcher.check_pass_status(user, tribe_id);
     assert!(status, "tribe status not valid");
-   
-    
+
     // Fast forward time to within grace period
     let current_time = get_block_timestamp();
     start_cheat_block_timestamp(vault_address, current_time + duration + 1000);
     let status = vault_dispatcher.check_pass_status(user, tribe_id);
     assert!(status, "tribe status not in grace period");
-    
+
     // Fast forward beyond grace period
     start_cheat_block_timestamp(vault_address, current_time + duration + grace_period + 1000);
-    
+
     // Check status after grace period (should be Expired)
     let status = vault_dispatcher.check_pass_status(user, tribe_id);
     assert!(!status, "tribe status still valid");
-    
+
     stop_cheat_block_timestamp(vault_address);
 }
 
@@ -732,22 +936,22 @@ fn test_burn_expired_pass() {
     let passcost: u256 = 10000_u256;
     let payment_address = contract_address_const::<'payment_address'>();
     let collection_details: ByteArray = "Test collection description";
-    
+
     // Deploy contracts
     let factory_address = deploy_factory_contract();
     let USDC_address = deploy_token();
-    
+
     let factory_dispatcher = ITribesFactoryDispatcher { contract_address: factory_address };
-    
+
     // Add supported token
     start_cheat_caller_address(factory_address, owner);
     factory_dispatcher.add_supported_token(USDC_address);
     stop_cheat_caller_address(factory_address);
-    
+
     // Create collection
     start_cheat_caller_address(factory_address, pauser);
     let (tribes_nft_address, vault_address) = factory_dispatcher
-    .create_collection(
+        .create_collection(
             pauser,
             name,
             symbol,
@@ -759,21 +963,25 @@ fn test_burn_expired_pass() {
             collection_details,
         );
     stop_cheat_caller_address(factory_address);
-    
+
     let token_dispatcher = IUSDCTokenDispatcher { contract_address: USDC_address };
     let vault_dispatcher = IVaultDispatcher { contract_address: vault_address };
     let nft_dispatcher = ERC721ABIDispatcher { contract_address: tribes_nft_address };
-    
+
     // Give user tokens and approve them for vault
     let amount: u256 = 1_000_000_u256;
     start_cheat_caller_address(USDC_address, owner);
     token_dispatcher.transfer(user, amount);
     stop_cheat_caller_address(USDC_address);
-    
+
     start_cheat_caller_address(USDC_address, user);
     token_dispatcher.approve(vault_address, amount);
     stop_cheat_caller_address(USDC_address);
-    
+
+    let nft_dispatcher1 = IERC721Dispatcher { contract_address: tribes_nft_address };
+    start_cheat_caller_address(tribes_nft_address, pauser);
+    nft_dispatcher1.whitelist_address(user);
+
     // Mint a pass
     start_cheat_caller_address(vault_address, user);
     vault_dispatcher.mint_pass(pauser, tribes_nft_address);
@@ -781,16 +989,15 @@ fn test_burn_expired_pass() {
     println!("nft balance of user: {}", nft_balance_of_user);
     assert!(nft_balance_of_user == 1, "incorrect nft balance before burn");
     stop_cheat_caller_address(vault_address);
-    
+
     // Get tribe details to get tribe ID
     let tribe_details = vault_dispatcher.get_tribe_info(tribes_nft_address);
     let tribe_id = tribe_details.tribe_id;
-    
-    
+
     // Fast forward beyond pass expiration and grace period
     let current_time = get_block_timestamp();
     start_cheat_block_timestamp(vault_address, current_time + duration + grace_period + 10000);
-    
+
     //approve nft to artist
     start_cheat_caller_address(tribes_nft_address, user);
     nft_dispatcher.approve(vault_address, tribe_id.into());
@@ -823,101 +1030,18 @@ fn test_burn_expired_pass_should_panic_caller_is_not_the_owner() {
     let passcost: u256 = 10000_u256;
     let payment_address = contract_address_const::<'payment_address'>();
     let collection_details: ByteArray = "Test collection description";
-    
+
     // Deploy contracts
     let factory_address = deploy_factory_contract();
     let USDC_address = deploy_token();
-    
+
     let factory_dispatcher = ITribesFactoryDispatcher { contract_address: factory_address };
-    
+
     // Add supported token
     start_cheat_caller_address(factory_address, owner);
     factory_dispatcher.add_supported_token(USDC_address);
     stop_cheat_caller_address(factory_address);
-    
-    // Create collection
-    start_cheat_caller_address(factory_address, pauser);
-    let (tribes_nft_address, vault_address) = factory_dispatcher
-    .create_collection(
-            pauser,
-            name,
-            symbol,
-            duration,
-            grace_period,
-            passcost,
-            payment_address,
-            USDC_address,
-            collection_details,
-        );
-    stop_cheat_caller_address(factory_address);
-    
-    let token_dispatcher = IUSDCTokenDispatcher { contract_address: USDC_address };
-    let vault_dispatcher = IVaultDispatcher { contract_address: vault_address };
-    let nft_dispatcher = ERC721ABIDispatcher { contract_address: tribes_nft_address };
-    
-    // Give user tokens and approve them for vault
-    let amount: u256 = 1_000_000_u256;
-    start_cheat_caller_address(USDC_address, owner);
-    token_dispatcher.transfer(user, amount);
-    stop_cheat_caller_address(USDC_address);
-    
-    start_cheat_caller_address(USDC_address, user);
-    token_dispatcher.approve(vault_address, amount);
-    stop_cheat_caller_address(USDC_address);
-    
-    // Mint a pass
-    start_cheat_caller_address(vault_address, user);
-    vault_dispatcher.mint_pass(pauser, tribes_nft_address);
-    let nft_balance_of_user = nft_dispatcher.balance_of(user);
-    assert!(nft_balance_of_user == 1, "incorrect nft balance before burn");
-    stop_cheat_caller_address(vault_address);
-    
-    // Get tribe details to get tribe ID
-    let tribe_details = vault_dispatcher.get_tribe_info(tribes_nft_address);
-    let tribe_id = tribe_details.tribe_id;
-    
-    
-    // Fast forward beyond pass expiration and grace period
-    let current_time = get_block_timestamp();
-    start_cheat_block_timestamp(vault_address, current_time + duration + grace_period + 10000);
-    
-    //approve nft to artist
-    start_cheat_caller_address(tribes_nft_address, user);
-    nft_dispatcher.approve(vault_address, tribe_id.into());
-    stop_cheat_caller_address(tribes_nft_address);
 
-    // Now burn the expired pass by non-owner
-    vault_dispatcher.burn_expired_pass(tribe_id, user);
-    
-    stop_cheat_block_timestamp(vault_address);
-}
-
-
-#[test]
-fn test_get_tribe_info() {
-    // Setup similar to previous tests
-    let pauser = contract_address_const::<'pauser'>();
-    let user = contract_address_const::<'user'>();
-    let owner = contract_address_const::<'owner'>();
-    let name = "TestCollection";
-    let symbol = "TEST";
-    let duration: u64 = 1746461445 + 86400;
-    let grace_period: u64 = duration + 3600;
-    let passcost: u256 = 10000_u256;
-    let payment_address = contract_address_const::<'payment_address'>();
-    let collection_details: ByteArray = "Test collection description";
-    
-    // Deploy contracts
-    let factory_address = deploy_factory_contract();
-    let USDC_address = deploy_token();
-    
-    let factory_dispatcher = ITribesFactoryDispatcher { contract_address: factory_address };
-    
-    // Add supported token
-    start_cheat_caller_address(factory_address, owner);
-    factory_dispatcher.add_supported_token(USDC_address);
-    stop_cheat_caller_address(factory_address);
-    
     // Create collection
     start_cheat_caller_address(factory_address, pauser);
     let (tribes_nft_address, vault_address) = factory_dispatcher
@@ -933,12 +1057,98 @@ fn test_get_tribe_info() {
             collection_details,
         );
     stop_cheat_caller_address(factory_address);
-    
+
+    let token_dispatcher = IUSDCTokenDispatcher { contract_address: USDC_address };
     let vault_dispatcher = IVaultDispatcher { contract_address: vault_address };
-    
+    let nft_dispatcher = ERC721ABIDispatcher { contract_address: tribes_nft_address };
+
+    // Give user tokens and approve them for vault
+    let amount: u256 = 1_000_000_u256;
+    start_cheat_caller_address(USDC_address, owner);
+    token_dispatcher.transfer(user, amount);
+    stop_cheat_caller_address(USDC_address);
+
+    start_cheat_caller_address(USDC_address, user);
+    token_dispatcher.approve(vault_address, amount);
+    stop_cheat_caller_address(USDC_address);
+
+    let nft_dispatcher1 = IERC721Dispatcher { contract_address: tribes_nft_address };
+    start_cheat_caller_address(tribes_nft_address, pauser);
+    nft_dispatcher1.whitelist_address(user);
+
+    // Mint a pass
+    start_cheat_caller_address(vault_address, user);
+    vault_dispatcher.mint_pass(pauser, tribes_nft_address);
+    let nft_balance_of_user = nft_dispatcher.balance_of(user);
+    assert!(nft_balance_of_user == 1, "incorrect nft balance before burn");
+    stop_cheat_caller_address(vault_address);
+
+    // Get tribe details to get tribe ID
+    let tribe_details = vault_dispatcher.get_tribe_info(tribes_nft_address);
+    let tribe_id = tribe_details.tribe_id;
+
+    // Fast forward beyond pass expiration and grace period
+    let current_time = get_block_timestamp();
+    start_cheat_block_timestamp(vault_address, current_time + duration + grace_period + 10000);
+
+    //approve nft to artist
+    start_cheat_caller_address(tribes_nft_address, user);
+    nft_dispatcher.approve(vault_address, tribe_id.into());
+    stop_cheat_caller_address(tribes_nft_address);
+
+    // Now burn the expired pass by non-owner
+    vault_dispatcher.burn_expired_pass(tribe_id, user);
+
+    stop_cheat_block_timestamp(vault_address);
+}
+
+
+#[test]
+fn test_get_tribe_info() {
+    // Setup similar to previous tests
+    let pauser = contract_address_const::<'pauser'>();
+    let _user = contract_address_const::<'user'>();
+    let owner = contract_address_const::<'owner'>();
+    let name = "TestCollection";
+    let symbol = "TEST";
+    let duration: u64 = 1746461445 + 86400;
+    let grace_period: u64 = duration + 3600;
+    let passcost: u256 = 10000_u256;
+    let payment_address = contract_address_const::<'payment_address'>();
+    let collection_details: ByteArray = "Test collection description";
+
+    // Deploy contracts
+    let factory_address = deploy_factory_contract();
+    let USDC_address = deploy_token();
+
+    let factory_dispatcher = ITribesFactoryDispatcher { contract_address: factory_address };
+
+    // Add supported token
+    start_cheat_caller_address(factory_address, owner);
+    factory_dispatcher.add_supported_token(USDC_address);
+    stop_cheat_caller_address(factory_address);
+
+    // Create collection
+    start_cheat_caller_address(factory_address, pauser);
+    let (tribes_nft_address, vault_address) = factory_dispatcher
+        .create_collection(
+            pauser,
+            name,
+            symbol,
+            duration,
+            grace_period,
+            passcost,
+            payment_address,
+            USDC_address,
+            collection_details,
+        );
+    stop_cheat_caller_address(factory_address);
+
+    let vault_dispatcher = IVaultDispatcher { contract_address: vault_address };
+
     // Get tribe info and verify values
     let tribe_info = vault_dispatcher.get_tribe_info(tribes_nft_address);
-    
+
     assert!(tribe_info.artist == pauser, "Incorrect artist address");
     assert!(tribe_info.tribe_nft_address == tribes_nft_address, "Incorrect NFT address");
     assert!(tribe_info.pass_cost == passcost, "Incorrect pass cost");
@@ -962,18 +1172,18 @@ fn test_get_artist_info() {
     let passcost: u256 = 10000_u256;
     let payment_address = contract_address_const::<'payment_address'>();
     let collection_details: ByteArray = "Test collection description";
-    
+
     // Deploy contracts
     let factory_address = deploy_factory_contract();
     let USDC_address = deploy_token();
-    
+
     let factory_dispatcher = ITribesFactoryDispatcher { contract_address: factory_address };
-    
+
     // Add supported token
     start_cheat_caller_address(factory_address, owner);
     factory_dispatcher.add_supported_token(USDC_address);
     stop_cheat_caller_address(factory_address);
-    
+
     // Create collection
     start_cheat_caller_address(factory_address, pauser);
     let (tribes_nft_address, vault_address) = factory_dispatcher
@@ -989,35 +1199,41 @@ fn test_get_artist_info() {
             collection_details,
         );
     stop_cheat_caller_address(factory_address);
-    
+
     let token_dispatcher = IUSDCTokenDispatcher { contract_address: USDC_address };
     let vault_dispatcher = IVaultDispatcher { contract_address: vault_address };
-    
+
     // Check initial artist info (before any passes)
     let initial_artist_info = vault_dispatcher.get_artist_info(pauser);
     assert!(initial_artist_info.artist == pauser, "Incorrect artist address");
     assert!(initial_artist_info.total_royalties_earned == 0, "Initial royalties should be 0");
     assert!(initial_artist_info.total_passes == 0, "Initial passes should be 0");
     assert!(initial_artist_info.active_passes == 0, "Initial active passes should be 0");
-    
+
     // Give user tokens and approve them for vault
     let amount: u256 = 1_000_000_u256;
     start_cheat_caller_address(USDC_address, owner);
     token_dispatcher.transfer(user, amount);
     stop_cheat_caller_address(USDC_address);
-    
+
     start_cheat_caller_address(USDC_address, user);
     token_dispatcher.approve(vault_address, amount);
     stop_cheat_caller_address(USDC_address);
-    
+
+    let nft_dispatcher = IERC721Dispatcher { contract_address: tribes_nft_address };
+    start_cheat_caller_address(tribes_nft_address, pauser);
+    nft_dispatcher.whitelist_address(user);
+
     // Mint a pass
     start_cheat_caller_address(vault_address, user);
     vault_dispatcher.mint_pass(pauser, tribes_nft_address);
     stop_cheat_caller_address(vault_address);
-    
+
     // Check artist info after minting
     let artist_info_after_mint = vault_dispatcher.get_artist_info(pauser);
-    assert!(artist_info_after_mint.total_royalties_earned == 7000, "Incorrect royalties after mint");
+    assert!(
+        artist_info_after_mint.total_royalties_earned == 7000, "Incorrect royalties after mint"
+    );
     assert!(artist_info_after_mint.total_passes == 1, "Should have 1 total pass");
     assert!(artist_info_after_mint.active_passes == 1, "Should have 1 active pass");
 }
@@ -1035,18 +1251,18 @@ fn test_get_user_pass() {
     let passcost: u256 = 10000_u256;
     let payment_address = contract_address_const::<'payment_address'>();
     let collection_details: ByteArray = "Test collection description";
-    
+
     // Deploy contracts
     let factory_address = deploy_factory_contract();
     let USDC_address = deploy_token();
-    
+
     let factory_dispatcher = ITribesFactoryDispatcher { contract_address: factory_address };
-    
+
     // Add supported token
     start_cheat_caller_address(factory_address, owner);
     factory_dispatcher.add_supported_token(USDC_address);
     stop_cheat_caller_address(factory_address);
-    
+
     // Create collection
     start_cheat_caller_address(factory_address, pauser);
     let (tribes_nft_address, vault_address) = factory_dispatcher
@@ -1062,34 +1278,37 @@ fn test_get_user_pass() {
             collection_details,
         );
     stop_cheat_caller_address(factory_address);
-    
+
     let token_dispatcher = IUSDCTokenDispatcher { contract_address: USDC_address };
     let vault_dispatcher = IVaultDispatcher { contract_address: vault_address };
-    
+
     // Give user tokens and approve them for vault
     let amount: u256 = 1_000_000_u256;
     start_cheat_caller_address(USDC_address, owner);
     token_dispatcher.transfer(user, amount);
     stop_cheat_caller_address(USDC_address);
-    
+
     start_cheat_caller_address(USDC_address, user);
     token_dispatcher.approve(vault_address, amount);
     stop_cheat_caller_address(USDC_address);
-    
+
+    let nft_dispatcher = IERC721Dispatcher { contract_address: tribes_nft_address };
+    start_cheat_caller_address(tribes_nft_address, pauser);
+    nft_dispatcher.whitelist_address(user);
+
     // Mint a pass
     start_cheat_caller_address(vault_address, user);
     vault_dispatcher.mint_pass(pauser, tribes_nft_address);
     stop_cheat_caller_address(vault_address);
-    
+
     // Get user pass details
     let user_pass = vault_dispatcher.get_user_pass(user);
-    
+
     // Get tribe details to compare token ID
     let tribe_details = vault_dispatcher.get_tribe_info(tribes_nft_address);
-    
+
     assert!(user_pass.tribe_nft_address == tribes_nft_address, "Incorrect NFT address");
     assert!(user_pass.token_id == tribe_details.tribe_id.into(), "Incorrect token ID");
     assert!(user_pass.owner == user, "Incorrect owner address");
     assert!(user_pass.is_valid, "Pass should be valid");
-
 }

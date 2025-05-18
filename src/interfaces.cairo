@@ -7,7 +7,11 @@ use loop_starknet::factory::TribesNftFactory::Collection;
 #[starknet::interface]
 pub trait IERC721<TContractState> {
     fn mint_ticket_nft(ref self: TContractState, recipient: ContractAddress, token_id: u256);
-    fn burn_nft(ref self: TContractState, token_id: u256); 
+    fn burn_nft(ref self: TContractState, token_id: u256);
+    fn pause(ref self: TContractState);
+    fn unpause(ref self: TContractState);
+    fn whitelist_address(ref self: TContractState, address: ContractAddress);
+    fn is_whitelisted(ref self: TContractState, address: ContractAddress) -> bool;
 }
 
 
@@ -46,7 +50,7 @@ pub trait IVault<TContractState> {
     );
     fn burn_expired_pass(ref self: TContractState, token_id: u32, user: ContractAddress);
 
-    fn check_pass_status(self: @TContractState,user: ContractAddress, token_id: u32) -> bool;
+    fn check_pass_status(self: @TContractState, user: ContractAddress, token_id: u32) -> bool;
     fn get_validity(self: @TContractState, token_id: u32) -> TribePassValidity;
     fn get_artist_info(self: @TContractState, artist_address: ContractAddress) -> ArtistDetails;
     fn get_user_pass(self: @TContractState, user: ContractAddress) -> PassDetails;

@@ -1,11 +1,10 @@
-
 const PAUSER_ROLE: felt252 = selector!("PAUSER_ROLE");
 const MINTER_ROLE: felt252 = selector!("MINTER_ROLE");
 
 #[starknet::contract]
 pub mod TribesNFT {
     use starknet::{ContractAddress, get_caller_address};
-    use starknet::storage::{StoragePointerWriteAccess, StoragePointerReadAccess};
+    use starknet::storage::{Map, StorageMapReadAccess, StorageMapWriteAccess,};
     use core::num::traits::Zero;
     use openzeppelin::access::accesscontrol::AccessControlComponent;
     use openzeppelin::introspection::src5::SRC5Component;
@@ -44,7 +43,8 @@ pub mod TribesNFT {
         pausable: PausableComponent::Storage,
         #[substorage(v0)]
         accesscontrol: AccessControlComponent::Storage,
-        next_token_id: u256
+        next_token_id: u256,
+        whitelist: Map<ContractAddress, bool>,
     }
 
     #[event]
@@ -93,14 +93,41 @@ pub mod TribesNFT {
     #[abi(embed_v0)]
     impl IERC721Impl of IERC721<ContractState> {
         fn burn_nft(ref self: ContractState, token_id: u256) {
+            let owner = self.erc721.ownerOf(token_id);
+            self.whitelist.write(owner, false);
             self.erc721.update(Zero::zero(), token_id, get_caller_address());
         }
 
         fn mint_ticket_nft(ref self: ContractState, recipient: ContractAddress, token_id: u256) {
+            let is_whitelisted = self.whitelist.read(recipient);
+            assert(is_whitelisted, 'Not Whitelisted');
             let balance = self.erc721.balance_of(recipient);
             assert(balance.is_zero(), 'ALREADY_MINTED');
 
             self._mint(recipient, token_id);
+        }
+
+        fn pause(ref self: ContractState) {
+            self.accesscontrol.assert_only_role(PAUSER_ROLE);
+            self.pausable.pause();
+        }
+
+
+        fn unpause(ref self: ContractState) {
+            self.accesscontrol.assert_only_role(PAUSER_ROLE);
+            self.pausable.unpause();
+        }
+
+        fn whitelist_address(ref self: ContractState, address: ContractAddress) {
+            self.accesscontrol.assert_only_role(PAUSER_ROLE);
+            let is_whitelisted = self.whitelist.read(address);
+            assert(!is_whitelisted, 'Already Whitelisted');
+            self.whitelist.write(address, true);
+        }
+
+        fn is_whitelisted(ref self: ContractState, address: ContractAddress) -> bool {
+            let is_whitelisted = self.whitelist.read(address);
+            is_whitelisted
         }
     }
 
@@ -108,17 +135,17 @@ pub mod TribesNFT {
     #[generate_trait]
     #[abi(per_item)]
     impl ExternalImpl of ExternalTrait {
-        #[external(v0)]
-        fn pause(ref self: ContractState) {
-            self.accesscontrol.assert_only_role(PAUSER_ROLE);
-            self.pausable.pause();
-        }
+        // #[external(v0)]
+        // fn pause(ref self: ContractState) {
+        //     self.accesscontrol.assert_only_role(PAUSER_ROLE);
+        //     self.pausable.pause();
+        // }
 
-        #[external(v0)]
-        fn unpause(ref self: ContractState) {
-            self.accesscontrol.assert_only_role(PAUSER_ROLE);
-            self.pausable.unpause();
-        }
+        // #[external(v0)]
+        // fn unpause(ref self: ContractState) {
+        //     self.accesscontrol.assert_only_role(PAUSER_ROLE);
+        //     self.pausable.unpause();
+        // }
 
         #[external(v0)]
         fn _mint(ref self: ContractState, recipient: ContractAddress, token_id: u256,) {
