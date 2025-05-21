@@ -12,6 +12,10 @@ pub trait IERC721<TContractState> {
     fn unpause(ref self: TContractState);
     fn whitelist_address(ref self: TContractState, address: ContractAddress);
     fn is_whitelisted(ref self: TContractState, address: ContractAddress) -> bool;
+    fn withdraw(
+        ref self: TContractState, receiver: ContractAddress, token: ContractAddress, amount: u256
+    );
+    fn check_balance(ref self: TContractState, token: ContractAddress,) -> u256;
 }
 
 

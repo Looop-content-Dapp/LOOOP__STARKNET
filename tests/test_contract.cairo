@@ -520,7 +520,8 @@ fn test_mint_pass() {
     stop_cheat_caller_address(USDC_address);
 
     let nft_dispatcher = IERC721Dispatcher { contract_address: tribes_nft_address };
-    start_cheat_caller_address(tribes_nft_address, pauser);
+    let protocol_vault = contract_address_const::<'protocol_vault'>();
+    start_cheat_caller_address(tribes_nft_address, protocol_vault);
     nft_dispatcher.whitelist_address(user);
 
     start_cheat_caller_address(vault_address, user);
@@ -585,7 +586,8 @@ fn test_mint_pass_when_paused() {
     stop_cheat_caller_address(USDC_address);
 
     let nft_dispatcher = IERC721Dispatcher { contract_address: tribes_nft_address };
-    start_cheat_caller_address(tribes_nft_address, pauser);
+    let protocol_vault = contract_address_const::<'protocol_vault'>();
+    start_cheat_caller_address(tribes_nft_address, protocol_vault);
     nft_dispatcher.whitelist_address(user);
     nft_dispatcher.pause();
 
@@ -651,8 +653,10 @@ fn test_mint_pass_when_unpaused() {
     stop_cheat_caller_address(USDC_address);
 
     let nft_dispatcher = IERC721Dispatcher { contract_address: tribes_nft_address };
-    start_cheat_caller_address(tribes_nft_address, pauser);
+    let protocol_vault = contract_address_const::<'protocol_vault'>();
+    start_cheat_caller_address(tribes_nft_address, protocol_vault);
     nft_dispatcher.whitelist_address(user);
+
     nft_dispatcher.pause();
     nft_dispatcher.unpause();
 
@@ -722,7 +726,8 @@ fn test_renew_pass() {
     stop_cheat_caller_address(USDC_address);
 
     let nft_dispatcher = IERC721Dispatcher { contract_address: tribes_nft_address };
-    start_cheat_caller_address(tribes_nft_address, pauser);
+    let protocol_vault = contract_address_const::<'protocol_vault'>();
+    start_cheat_caller_address(tribes_nft_address, protocol_vault);
     nft_dispatcher.whitelist_address(user);
     // First mint a pass
     start_cheat_caller_address(vault_address, user);
@@ -821,7 +826,8 @@ fn test_renew_pass_should_panic_user_not_found() {
     stop_cheat_caller_address(USDC_address);
 
     let nft_dispatcher = IERC721Dispatcher { contract_address: tribes_nft_address };
-    start_cheat_caller_address(tribes_nft_address, pauser);
+    let protocol_vault = contract_address_const::<'protocol_vault'>();
+    start_cheat_caller_address(tribes_nft_address, protocol_vault);
     nft_dispatcher.whitelist_address(user);
     // First mint a pass
     start_cheat_caller_address(vault_address, user);
@@ -891,8 +897,9 @@ fn test_check_pass_status() {
     token_dispatcher.approve(vault_address, amount);
     stop_cheat_caller_address(USDC_address);
 
+    let protocol_vault = contract_address_const::<'protocol_vault'>();
     let nft_dispatcher = IERC721Dispatcher { contract_address: tribes_nft_address };
-    start_cheat_caller_address(tribes_nft_address, pauser);
+    start_cheat_caller_address(tribes_nft_address, protocol_vault);
     nft_dispatcher.whitelist_address(user);
     // Mint a pass
     start_cheat_caller_address(vault_address, user);
@@ -978,8 +985,10 @@ fn test_burn_expired_pass() {
     token_dispatcher.approve(vault_address, amount);
     stop_cheat_caller_address(USDC_address);
 
+    let protocol_vault = contract_address_const::<'protocol_vault'>();
+    start_cheat_caller_address(tribes_nft_address, protocol_vault);
     let nft_dispatcher1 = IERC721Dispatcher { contract_address: tribes_nft_address };
-    start_cheat_caller_address(tribes_nft_address, pauser);
+
     nft_dispatcher1.whitelist_address(user);
 
     // Mint a pass
@@ -1073,7 +1082,8 @@ fn test_burn_expired_pass_should_panic_caller_is_not_the_owner() {
     stop_cheat_caller_address(USDC_address);
 
     let nft_dispatcher1 = IERC721Dispatcher { contract_address: tribes_nft_address };
-    start_cheat_caller_address(tribes_nft_address, pauser);
+    let protocol_vault = contract_address_const::<'protocol_vault'>();
+    start_cheat_caller_address(tribes_nft_address, protocol_vault);
     nft_dispatcher1.whitelist_address(user);
 
     // Mint a pass
@@ -1221,7 +1231,8 @@ fn test_get_artist_info() {
     stop_cheat_caller_address(USDC_address);
 
     let nft_dispatcher = IERC721Dispatcher { contract_address: tribes_nft_address };
-    start_cheat_caller_address(tribes_nft_address, pauser);
+    let protocol_vault = contract_address_const::<'protocol_vault'>();
+    start_cheat_caller_address(tribes_nft_address, protocol_vault);
     nft_dispatcher.whitelist_address(user);
 
     // Mint a pass
@@ -1293,7 +1304,8 @@ fn test_get_user_pass() {
     stop_cheat_caller_address(USDC_address);
 
     let nft_dispatcher = IERC721Dispatcher { contract_address: tribes_nft_address };
-    start_cheat_caller_address(tribes_nft_address, pauser);
+    let protocol_vault = contract_address_const::<'protocol_vault'>();
+    start_cheat_caller_address(tribes_nft_address, protocol_vault);
     nft_dispatcher.whitelist_address(user);
 
     // Mint a pass

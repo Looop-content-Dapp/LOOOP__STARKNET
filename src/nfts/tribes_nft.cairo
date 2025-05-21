@@ -3,13 +3,17 @@ const MINTER_ROLE: felt252 = selector!("MINTER_ROLE");
 
 #[starknet::contract]
 pub mod TribesNFT {
-    use starknet::{ContractAddress, get_caller_address};
-    use starknet::storage::{Map, StorageMapReadAccess, StorageMapWriteAccess,};
+    use starknet::{ContractAddress, get_caller_address, get_contract_address};
+    use starknet::storage::{
+        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
+        StoragePointerWriteAccess,
+    };
     use core::num::traits::Zero;
     use openzeppelin::access::accesscontrol::AccessControlComponent;
     use openzeppelin::introspection::src5::SRC5Component;
     use openzeppelin::security::pausable::PausableComponent;
     use openzeppelin::token::erc721::ERC721Component;
+    use openzeppelin_token::erc20::{ERC20ABIDispatcher, ERC20ABIDispatcherTrait};
     use super::{PAUSER_ROLE, MINTER_ROLE};
     use loop_starknet::interfaces::IERC721;
 
@@ -44,7 +48,9 @@ pub mod TribesNFT {
         #[substorage(v0)]
         accesscontrol: AccessControlComponent::Storage,
         next_token_id: u256,
+        authorized_address: ContractAddress,
         whitelist: Map<ContractAddress, bool>,
+        pause: bool,
     }
 
     #[event]
@@ -62,12 +68,16 @@ pub mod TribesNFT {
 
     #[constructor]
     fn constructor(
-        ref self: ContractState, pauser: ContractAddress, name: ByteArray, symbol: ByteArray
+        ref self: ContractState,
+        pauser: ContractAddress,
+        name: ByteArray,
+        symbol: ByteArray,
+        authorized_address: ContractAddress,
     ) {
         self.erc721.initializer(name, symbol, "");
         self.accesscontrol.initializer();
-
         self.accesscontrol._grant_role(PAUSER_ROLE, pauser);
+        self.authorized_address.write(authorized_address);
     }
 
     impl ERC721HooksImpl of ERC721Component::ERC721HooksTrait<ContractState> {
@@ -108,18 +118,26 @@ pub mod TribesNFT {
         }
 
         fn pause(ref self: ContractState) {
-            self.accesscontrol.assert_only_role(PAUSER_ROLE);
+            let caller = get_caller_address();
+            let authorized_address = self.authorized_address.read();
+            assert(caller == authorized_address, 'User Not Authorized');
+            self.pause.write(true);
             self.pausable.pause();
         }
 
 
         fn unpause(ref self: ContractState) {
-            self.accesscontrol.assert_only_role(PAUSER_ROLE);
+            let caller = get_caller_address();
+            let authorized_address = self.authorized_address.read();
+            assert(caller == authorized_address, 'User Not Authorized');
+            self.pause.write(false);
             self.pausable.unpause();
         }
 
         fn whitelist_address(ref self: ContractState, address: ContractAddress) {
-            self.accesscontrol.assert_only_role(PAUSER_ROLE);
+            let caller = get_caller_address();
+            let authorized_address = self.authorized_address.read();
+            assert(caller == authorized_address, 'User Not Authorized');
             let is_whitelisted = self.whitelist.read(address);
             assert(!is_whitelisted, 'Already Whitelisted');
             self.whitelist.write(address, true);
@@ -128,6 +146,28 @@ pub mod TribesNFT {
         fn is_whitelisted(ref self: ContractState, address: ContractAddress) -> bool {
             let is_whitelisted = self.whitelist.read(address);
             is_whitelisted
+        }
+
+        fn withdraw(
+            ref self: ContractState, receiver: ContractAddress, token: ContractAddress, amount: u256
+        ) {
+            self.accesscontrol.assert_only_role(PAUSER_ROLE);
+            let paused: bool = self.pause.read();
+            assert(!paused, 'withdrawal paused');
+            assert(receiver.is_non_zero(), 'invalid receiver');
+            let erc20_dispatcher = ERC20ABIDispatcher { contract_address: token };
+            assert(
+                amount >= erc20_dispatcher.balance_of(get_contract_address()), 'insufficient bal'
+            );
+            erc20_dispatcher.transfer(receiver, amount);
+        }
+
+        fn check_balance(ref self: ContractState, token: ContractAddress,) -> u256 {
+            self.accesscontrol.assert_only_role(PAUSER_ROLE);
+
+            let erc20_dispatcher = ERC20ABIDispatcher { contract_address: token };
+            let balance = erc20_dispatcher.balance_of(get_contract_address());
+            balance
         }
     }
 
@@ -143,7 +183,7 @@ pub mod TribesNFT {
 
         // #[external(v0)]
         // fn unpause(ref self: ContractState) {
-        //     self.accesscontrol.assert_only_role(PAUSER_ROLE);
+        // self.accesscontrol.assert_only_role(PAUSER_ROLE);
         //     self.pausable.unpause();
         // }
 

@@ -153,6 +153,7 @@ pub mod TribesNftFactory {
             pauser.serialize(ref tribes_constructor_calldata);
             name.serialize(ref tribes_constructor_calldata);
             symbol.serialize(ref tribes_constructor_calldata);
+            protocol_vault.serialize(ref tribes_constructor_calldata);
 
             let (tribes_nft_address, _) = deploy_syscall(
                 tribes_classhash, 0, tribes_constructor_calldata.span(), true
