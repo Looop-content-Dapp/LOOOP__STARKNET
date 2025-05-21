@@ -16,6 +16,7 @@ pub trait IERC721<TContractState> {
         ref self: TContractState, receiver: ContractAddress, token: ContractAddress, amount: u256
     );
     fn check_balance(ref self: TContractState, token: ContractAddress,) -> u256;
+    fn has_expired(ref self: TContractState, token_uri: u256) -> bool;
 }
 
 

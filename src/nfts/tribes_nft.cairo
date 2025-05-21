@@ -3,7 +3,7 @@ const MINTER_ROLE: felt252 = selector!("MINTER_ROLE");
 
 #[starknet::contract]
 pub mod TribesNFT {
-    use starknet::{ContractAddress, get_caller_address, get_contract_address};
+    use starknet::{ContractAddress, get_caller_address, get_contract_address, get_block_timestamp};
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
         StoragePointerWriteAccess,
@@ -50,6 +50,7 @@ pub mod TribesNFT {
         next_token_id: u256,
         authorized_address: ContractAddress,
         whitelist: Map<ContractAddress, bool>,
+        expiry_date: Map<u256, u64>,
         pause: bool,
     }
 
@@ -108,13 +109,24 @@ pub mod TribesNFT {
             self.erc721.update(Zero::zero(), token_id, get_caller_address());
         }
 
+        fn has_expired(ref self: ContractState, token_uri: u256) -> bool {
+            let timestamp = get_block_timestamp();
+            let expiry_date = self.expiry_date.read(token_uri);
+            let expired: bool = (timestamp > expiry_date);
+            expired
+        }
+
         fn mint_ticket_nft(ref self: ContractState, recipient: ContractAddress, token_id: u256) {
             let is_whitelisted = self.whitelist.read(recipient);
+            let timestamp = get_block_timestamp();
+            let thirty_days = 2592000;
+            let expiry_date = timestamp + thirty_days;
             assert(is_whitelisted, 'Not Whitelisted');
             let balance = self.erc721.balance_of(recipient);
             assert(balance.is_zero(), 'ALREADY_MINTED');
 
             self._mint(recipient, token_id);
+            self.expiry_date.write(token_id, expiry_date);
         }
 
         fn pause(ref self: ContractState) {
