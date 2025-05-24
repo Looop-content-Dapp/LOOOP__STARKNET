@@ -30,6 +30,7 @@ pub mod TribesNftFactory {
     struct Storage {
         vault_classhash: ClassHash,
         tribes_nft_classhash: ClassHash,
+        owner: ContractAddress,
         house_percentage: u32,
         collection_count: u32,
         protocol_vault: ContractAddress,
@@ -108,6 +109,7 @@ pub mod TribesNftFactory {
         self.protocol_vault.write(protocol_vault);
         self.house_percentage.write(house_percentage);
         self.vault_classhash.write(vault_classhash);
+        self.owner.write(owner);
         self.tribes_nft_classhash.write(tribes_classhash);
         self.payment_tokens.append().write(payment_token);
         self.is_payment_token.entry(payment_token).write(true);
@@ -140,7 +142,7 @@ pub mod TribesNftFactory {
             assert(!symbol_taken, 'symbol taken');
 
             let house_percentage = self.house_percentage.read();
-            let protocol_vault = self.protocol_vault.read();
+            let protocol_vault = self.owner.read();
             let collection_count = self.collection_count.read();
             let new_collections_count = collection_count + 1;
 
