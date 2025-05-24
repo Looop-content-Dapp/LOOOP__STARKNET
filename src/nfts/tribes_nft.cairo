@@ -65,8 +65,26 @@ pub mod TribesNFT {
         PausableEvent: PausableComponent::Event,
         #[flat]
         AccessControlEvent: AccessControlComponent::Event,
+        PassMinted: PassMinted,
+        PassBurned: PassBurned,
+        Message: Message,
     }
 
+    #[derive(Drop, starknet::Event)]
+    struct Message {
+        message: felt252,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct PassMinted {
+        owner: ContractAddress,
+        token_id: u256,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct PassBurned {
+        token_id: u256,
+    }
     #[constructor]
     fn constructor(
         ref self: ContractState,
@@ -107,17 +125,27 @@ pub mod TribesNFT {
             let owner = self.erc721.ownerOf(token_id);
             self.whitelist.write(owner, false);
             self.erc721.update(Zero::zero(), token_id, get_caller_address());
+            self.emit(PassBurned { token_id });
         }
 
-        fn has_expired(ref self: ContractState, token_uri: u256) -> bool {
+        fn pass_expiry_date(self: @ContractState, token_id: u256) -> u64 {
+            let expiry_date = self.expiry_date.read(token_id);
+            expiry_date
+        }
+
+        fn has_expired(ref self: ContractState, token_id: u256) -> bool {
             let timestamp = get_block_timestamp();
-            let expiry_date = self.expiry_date.read(token_uri);
+            let expiry_date = self.expiry_date.read(token_id);
             let expired: bool = (timestamp > expiry_date);
+            if (expired) {
+                self.burn_nft(token_id);
+            }
             expired
         }
 
-        fn mint_ticket_nft(ref self: ContractState, recipient: ContractAddress, token_id: u256) {
+        fn mint_ticket_nft(ref self: ContractState, recipient: ContractAddress) -> u256 {
             let is_whitelisted = self.whitelist.read(recipient);
+            let caller = get_caller_address();
             let timestamp = get_block_timestamp();
             let thirty_days = 2592000;
             let expiry_date = timestamp + thirty_days;
@@ -125,8 +153,13 @@ pub mod TribesNFT {
             let balance = self.erc721.balance_of(recipient);
             assert(balance.is_zero(), 'ALREADY_MINTED');
 
+            let token_id = self.next_token_id.read() + 1;
+
             self._mint(recipient, token_id);
             self.expiry_date.write(token_id, expiry_date);
+            self.next_token_id.write(token_id);
+            self.emit(PassMinted { owner: caller, token_id: token_id });
+            token_id
         }
 
         fn pause(ref self: ContractState) {
@@ -135,6 +168,7 @@ pub mod TribesNFT {
             assert(caller == authorized_address, 'User Not Authorized');
             self.pause.write(true);
             self.pausable.pause();
+            self.emit(Message { message: 'Paused' });
         }
 
 
@@ -144,6 +178,7 @@ pub mod TribesNFT {
             assert(caller == authorized_address, 'User Not Authorized');
             self.pause.write(false);
             self.pausable.unpause();
+            self.emit(Message { message: 'unPaused' });
         }
 
         fn whitelist_address(ref self: ContractState, address: ContractAddress) {
@@ -153,9 +188,10 @@ pub mod TribesNFT {
             let is_whitelisted = self.whitelist.read(address);
             assert(!is_whitelisted, 'Already Whitelisted');
             self.whitelist.write(address, true);
+            self.emit(Message { message: 'Whitelisted' });
         }
 
-        fn is_whitelisted(ref self: ContractState, address: ContractAddress) -> bool {
+        fn is_whitelisted(self: @ContractState, address: ContractAddress) -> bool {
             let is_whitelisted = self.whitelist.read(address);
             is_whitelisted
         }
@@ -172,9 +208,10 @@ pub mod TribesNFT {
                 amount >= erc20_dispatcher.balance_of(get_contract_address()), 'insufficient bal'
             );
             erc20_dispatcher.transfer(receiver, amount);
+            self.emit(Message { message: 'Withdraw Successful' });
         }
 
-        fn check_balance(ref self: ContractState, token: ContractAddress,) -> u256 {
+        fn check_balance(self: @ContractState, token: ContractAddress,) -> u256 {
             self.accesscontrol.assert_only_role(PAUSER_ROLE);
 
             let erc20_dispatcher = ERC20ABIDispatcher { contract_address: token };
@@ -187,18 +224,6 @@ pub mod TribesNFT {
     #[generate_trait]
     #[abi(per_item)]
     impl ExternalImpl of ExternalTrait {
-        // #[external(v0)]
-        // fn pause(ref self: ContractState) {
-        //     self.accesscontrol.assert_only_role(PAUSER_ROLE);
-        //     self.pausable.pause();
-        // }
-
-        // #[external(v0)]
-        // fn unpause(ref self: ContractState) {
-        // self.accesscontrol.assert_only_role(PAUSER_ROLE);
-        //     self.pausable.unpause();
-        // }
-
         #[external(v0)]
         fn _mint(ref self: ContractState, recipient: ContractAddress, token_id: u256,) {
             // self.accesscontrol.assert_only_role(MINTER_ROLE);

@@ -33,9 +33,6 @@ pub mod TribesNftFactory {
         owner: ContractAddress,
         house_percentage: u32,
         collection_count: u32,
-        protocol_vault: ContractAddress,
-        is_payment_token: Map<ContractAddress, bool>,
-        payment_tokens: Vec<ContractAddress>,
         collections: Vec<Collection>,
         id_to_collections: Map<u32, Collection>,
         artist_collections: Map<ContractAddress, Vec<Collection>>,
@@ -97,22 +94,14 @@ pub mod TribesNftFactory {
     fn constructor(
         ref self: ContractState,
         owner: ContractAddress,
-        protocol_vault: ContractAddress,
         house_percentage: u32,
-        vault_classhash: ClassHash,
         tribes_classhash: ClassHash,
-        payment_token: ContractAddress,
     ) {
         assert(owner.is_non_zero(), 'invalid owner or fee_collector');
-
         self.ownable.initializer(owner);
-        self.protocol_vault.write(protocol_vault);
         self.house_percentage.write(house_percentage);
-        self.vault_classhash.write(vault_classhash);
         self.owner.write(owner);
         self.tribes_nft_classhash.write(tribes_classhash);
-        self.payment_tokens.append().write(payment_token);
-        self.is_payment_token.entry(payment_token).write(true);
     }
 
     // #[abi_embed(v0)]
@@ -124,62 +113,28 @@ pub mod TribesNftFactory {
             pauser: ContractAddress,
             name: ByteArray,
             symbol: ByteArray,
-            duration: u64,
-            grace_period: u64,
-            pass_cost: u256,
-            payment_address: ContractAddress,
-            payment_token: ContractAddress,
             collection_details: ByteArray
-        ) -> (ContractAddress, ContractAddress) {
-            assert(
-                pauser.is_non_zero() && payment_address.is_non_zero(),
-                'invalid pauser or payment addr'
-            );
-            assert(
-                self.is_payment_token.entry(payment_token).read(), 'payment token not supported'
-            );
+        ) -> ContractAddress {
             let symbol_taken = self.check_symbol_is_taken(symbol.clone());
             assert(!symbol_taken, 'symbol taken');
 
             let house_percentage = self.house_percentage.read();
-            let protocol_vault = self.owner.read();
+
             let collection_count = self.collection_count.read();
             let new_collections_count = collection_count + 1;
 
             let tribes_classhash = self.tribes_nft_classhash.read();
-            let vault_classhash = self.vault_classhash.read();
 
             let artist_percentage = 100 - house_percentage;
-
+            let owner = self.owner.read();
             let mut tribes_constructor_calldata = ArrayTrait::new();
             pauser.serialize(ref tribes_constructor_calldata);
             name.serialize(ref tribes_constructor_calldata);
             symbol.serialize(ref tribes_constructor_calldata);
-            protocol_vault.serialize(ref tribes_constructor_calldata);
+            owner.serialize(ref tribes_constructor_calldata);
 
             let (tribes_nft_address, _) = deploy_syscall(
                 tribes_classhash, 0, tribes_constructor_calldata.span(), true
-            )
-                .unwrap_syscall();
-
-            let contract = get_contract_address();
-            let mut vault_constructor_calldata = ArrayTrait::new();
-
-            new_collections_count.serialize(ref vault_constructor_calldata);
-            pauser.serialize(ref vault_constructor_calldata);
-            tribes_nft_address.serialize(ref vault_constructor_calldata);
-            pass_cost.serialize(ref vault_constructor_calldata);
-            grace_period.serialize(ref vault_constructor_calldata);
-            duration.serialize(ref vault_constructor_calldata);
-            payment_address.serialize(ref vault_constructor_calldata);
-            house_percentage.serialize(ref vault_constructor_calldata);
-            artist_percentage.serialize(ref vault_constructor_calldata);
-            payment_token.serialize(ref vault_constructor_calldata);
-            protocol_vault.serialize(ref vault_constructor_calldata);
-            contract.serialize(ref vault_constructor_calldata);
-
-            let (vault_address, _) = deploy_syscall(
-                vault_classhash, 0, vault_constructor_calldata.span(), true
             )
                 .unwrap_syscall();
 
@@ -214,16 +169,9 @@ pub mod TribesNftFactory {
                     }
                 );
 
-            (tribes_nft_address, vault_address)
+            tribes_nft_address
         }
 
-        fn add_supported_token(ref self: ContractState, token: ContractAddress) {
-            self.ownable.assert_only_owner();
-            assert(token.is_non_zero(), 'invalid token');
-            assert(!self.is_payment_token.entry(token).read(), 'token already supported');
-            self.payment_tokens.append().write(token);
-            self.is_payment_token.entry(token).write(true);
-        }
 
         fn update_royalties(ref self: ContractState, new_house_percentage: u32) {
             self.ownable.assert_only_owner();
@@ -257,38 +205,6 @@ pub mod TribesNftFactory {
             };
 
             collection_arr
-        }
-
-        fn get_payment_tokens(self: @ContractState) -> Array<ContractAddress> {
-            let mut token_arr = ArrayTrait::new();
-
-            let token_list = self.payment_tokens.clone();
-            let mut i = 0;
-            while i != token_list.len() {
-                token_arr.append(token_list.at(i).read());
-                i += 1;
-            };
-
-            token_arr
-        }
-
-        fn remove_supported_token(ref self: ContractState, token: ContractAddress) {
-            self.ownable.assert_only_owner();
-            assert!(self.is_payment_token.entry(token).read(), "Token is not supported");
-
-            let len = self.payment_tokens.len();
-            let mut index = 0;
-
-            while index != len {
-                if self.payment_tokens.at(index).read() == token {
-                    let last_element = self.payment_tokens.at(len - 1).read();
-                    self.payment_tokens.at(index).write(last_element);
-                    // let _ = self.payment_tokens.pop();
-                    break;
-                }
-                index += 1;
-            };
-            self.is_payment_token.entry(token).write(false);
         }
 
 
