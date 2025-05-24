@@ -41,7 +41,7 @@ fn deploy_factory_contract() -> ContractAddress {
     protocol_vault.serialize(ref calldata);
     house_perc.serialize(ref calldata);
     vault_classhash.serialize(ref calldata);
-    tribes_classhash.serialize(ref calldata); 
+    tribes_classhash.serialize(ref calldata);
     USDC_address.serialize(ref calldata);
 
     let contract = declare("TribesNftFactory").unwrap().contract_class();
