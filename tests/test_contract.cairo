@@ -334,6 +334,3 @@ fn test_mint_pass_when_unpaused() {
     stop_cheat_caller_address(tribes_nft_address);
 }
 
-
-
-
