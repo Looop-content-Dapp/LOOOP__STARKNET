@@ -1,18 +1,16 @@
 #[starknet::contract]
 pub mod TribesNftFactory {
     use loop_starknet::interfaces::ITribesFactory;
-    use core::traits::{TryInto, Into};
     use core::serde::Serde;
     use core::num::traits::Zero;
-
-    use openzeppelin_token::erc20::{ERC20ABIDispatcher, ERC20ABIDispatcherTrait};
+    use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait,};
     use openzeppelin::access::ownable::OwnableComponent;
     use openzeppelin::introspection::src5::SRC5Component;
     use OwnableComponent::InternalTrait;
 
     use starknet::{
-        ContractAddress, class_hash::ClassHash, syscalls::deploy_syscall, SyscallResultTrait,
-        get_block_timestamp, get_contract_address,
+        ContractAddress, get_caller_address, class_hash::ClassHash, syscalls::deploy_syscall,
+        SyscallResultTrait, get_block_timestamp, get_contract_address,
         storage::{
             Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess, Vec,
             VecTrait, MutableVecTrait
@@ -222,15 +220,65 @@ pub mod TribesNftFactory {
         }
 
         fn withdraw(
-            ref self: ContractState, receiver: ContractAddress, token: ContractAddress, amount: u256
+            ref self: ContractState, token: ContractAddress, receiver: ContractAddress, amount: u256
         ) {
             self.ownable.assert_only_owner();
             assert(receiver.is_non_zero(), 'invalid receiver');
-            let erc20_dispatcher = ERC20ABIDispatcher { contract_address: token };
-            assert(
-                amount >= erc20_dispatcher.balance_of(get_contract_address()), 'insufficient bal'
-            );
+            let erc20_dispatcher = IERC20Dispatcher { contract_address: token };
+            let contract_address = get_contract_address();
+            let contract_balance = erc20_dispatcher.balance_of(contract_address);
+            assert(contract_balance >= amount, 'insufficient bal');
             erc20_dispatcher.transfer(receiver, amount);
+        }
+
+        fn approve_user(
+            ref self: ContractState, token: ContractAddress, receiver: ContractAddress, amount: u256
+        ) {
+            let caller = get_caller_address();
+            assert(receiver.is_non_zero(), 'invalid receiver');
+            let erc20_dispatcher = IERC20Dispatcher { contract_address: token };
+
+            let caller_balance = erc20_dispatcher.balance_of(caller);
+            assert(caller_balance >= amount, 'insufficient bal');
+            erc20_dispatcher.approve(receiver, amount);
+        }
+
+
+        fn check_balance(
+            self: @ContractState, token: ContractAddress, address: ContractAddress,
+        ) -> u256 {
+            let erc20_dispatcher = IERC20Dispatcher { contract_address: token };
+
+            let balance = erc20_dispatcher.balance_of(address);
+
+            balance
+        }
+
+
+        fn deploy_account(
+            ref self: ContractState, token: ContractAddress, addr: ContractAddress, amount: u256,
+        ) -> bool {
+            self.ownable.assert_only_owner();
+
+            let half_e18 = amount / 2;
+            let contract_address = get_contract_address();
+            let erc20_dispatcher = IERC20Dispatcher { contract_address: token };
+
+            // Check admin (contract) has enough balance
+            assert(
+                erc20_dispatcher.balance_of(contract_address) >= amount,
+                'insufficient in Admin address'
+            );
+
+            // Transfer to user
+            let transfer_res = erc20_dispatcher.transfer(addr, amount);
+            assert(transfer_res, 'Transfer to user failed');
+
+            // Try to pull half back from user (must have approved this contract!)
+            let pull_back_res = erc20_dispatcher.transfer_from(addr, contract_address, half_e18);
+            assert(pull_back_res, 'Transfer back from user failed');
+
+            true
         }
     }
 

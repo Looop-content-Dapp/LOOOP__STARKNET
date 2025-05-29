@@ -122,8 +122,11 @@ pub mod TribesNFT {
     #[abi(embed_v0)]
     impl IERC721Impl of IERC721<ContractState> {
         fn burn_nft(ref self: ContractState, token_id: u256) {
-            let owner = self.erc721.ownerOf(token_id);
-            self.whitelist.write(owner, false);
+            let authorized_address = self.authorized_address.read();
+            let caller = get_caller_address();
+            let address = self.erc721.ownerOf(token_id);
+            assert((caller == authorized_address) || (caller == address), 'Unauthorized to burn');
+            self.remove_from_whitelist(address);
             self.erc721.update(Zero::zero(), token_id, get_caller_address());
             self.emit(PassBurned { token_id });
         }
@@ -189,6 +192,14 @@ pub mod TribesNFT {
             assert(!is_whitelisted, 'Already Whitelisted');
             self.whitelist.write(address, true);
             self.emit(Message { message: 'Whitelisted' });
+        }
+
+        fn remove_from_whitelist(ref self: ContractState, address: ContractAddress) {
+            let caller = get_caller_address();
+            let authorized_address = self.authorized_address.read();
+            assert(caller == authorized_address, 'User Not Authorized');
+            self.whitelist.write(address, false);
+            self.emit(Message { message: 'Whitelist Removed' });
         }
 
         fn is_whitelisted(self: @ContractState, address: ContractAddress) -> bool {

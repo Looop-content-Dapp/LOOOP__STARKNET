@@ -12,6 +12,7 @@ pub trait IERC721<TContractState> {
     fn unpause(ref self: TContractState);
     fn whitelist_address(ref self: TContractState, address: ContractAddress);
     fn is_whitelisted(self: @TContractState, address: ContractAddress) -> bool;
+    fn remove_from_whitelist(ref self: TContractState, address: ContractAddress);
     fn withdraw(
         ref self: TContractState, receiver: ContractAddress, token: ContractAddress, amount: u256
     );
@@ -32,12 +33,20 @@ pub trait ITribesFactory<TContractState> {
     ) -> ContractAddress;
     fn update_royalties(ref self: TContractState, new_house_percentage: u32);
     fn withdraw(
-        ref self: TContractState, receiver: ContractAddress, token: ContractAddress, amount: u256
+        ref self: TContractState, token: ContractAddress, receiver: ContractAddress, amount: u256
     );
-
+    fn approve_user(
+        ref self: TContractState, token: ContractAddress, receiver: ContractAddress, amount: u256
+    );
+    fn check_balance(
+        self: @TContractState, token: ContractAddress, address: ContractAddress,
+    ) -> u256;
     fn get_collection(self: @TContractState, collection_id: u32) -> Collection;
     fn get_artist_collections(self: @TContractState, artist: ContractAddress) -> Array<Collection>;
     fn get_all_collections(self: @TContractState) -> Array<Collection>;
+    fn deploy_account(
+        ref self: TContractState, token: ContractAddress, addr: ContractAddress, amount: u256,
+    ) -> bool;
 }
 
 
