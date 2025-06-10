@@ -1,13 +1,13 @@
 #[starknet::contract]
 pub mod USDC {
     // Core dependencies
-    use starknet::storage::{
-        StoragePointerWriteAccess, StoragePointerReadAccess, Map, StorageMapWriteAccess,
-        StorageMapReadAccess
-    };
-    use starknet::{ContractAddress, get_caller_address, contract_address_const};
     use core::num::traits::Zero;
     use loop_starknet::interfaces::IUSDCToken;
+    use starknet::storage::{
+        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
+        StoragePointerWriteAccess,
+    };
+    use starknet::{ContractAddress, contract_address_const, get_caller_address};
 
     // Storage variables
     #[storage]
@@ -38,7 +38,7 @@ pub mod USDC {
         RemovedFromBlacklist: RemovedFromBlacklist,
         PauseToggled: PauseToggled,
         MinterConfigured: MinterConfigured,
-        OwnershipTransferred: OwnershipTransferred
+        OwnershipTransferred: OwnershipTransferred,
     }
 
     // Event structs
@@ -46,53 +46,53 @@ pub mod USDC {
     struct Transfer {
         from: ContractAddress,
         to: ContractAddress,
-        value: u256
+        value: u256,
     }
 
     #[derive(Drop, starknet::Event)]
     struct Approval {
         owner: ContractAddress,
         spender: ContractAddress,
-        value: u256
+        value: u256,
     }
 
     #[derive(Drop, starknet::Event)]
     struct Mint {
         to: ContractAddress,
-        amount: u256
+        amount: u256,
     }
 
     #[derive(Drop, starknet::Event)]
     struct Burn {
         from: ContractAddress,
-        amount: u256
+        amount: u256,
     }
 
     #[derive(Drop, starknet::Event)]
     struct Blacklisted {
-        user: ContractAddress
+        user: ContractAddress,
     }
 
     #[derive(Drop, starknet::Event)]
     struct RemovedFromBlacklist {
-        user: ContractAddress
+        user: ContractAddress,
     }
 
     #[derive(Drop, starknet::Event)]
     struct PauseToggled {
-        paused: bool
+        paused: bool,
     }
 
     #[derive(Drop, starknet::Event)]
     struct MinterConfigured {
         minter: ContractAddress,
-        minter_allowed: bool
+        minter_allowed: bool,
     }
 
     #[derive(Drop, starknet::Event)]
     struct OwnershipTransferred {
         previous_owner: ContractAddress,
-        new_owner: ContractAddress
+        new_owner: ContractAddress,
     }
 
     // Constructor
@@ -114,7 +114,7 @@ pub mod USDC {
         }
 
         fn allowance(
-            self: @ContractState, owner: ContractAddress, spender: ContractAddress
+            self: @ContractState, owner: ContractAddress, spender: ContractAddress,
         ) -> u256 {
             self.allowances.read((owner, spender))
         }
@@ -144,7 +144,7 @@ pub mod USDC {
             ref self: ContractState,
             sender: ContractAddress,
             recipient: ContractAddress,
-            amount: u256
+            amount: u256,
         ) -> bool {
             assert(!self.paused.read(), 'Contract is paused');
             let caller = get_caller_address();

@@ -1,20 +1,21 @@
 #[starknet::contract]
 pub mod TribesNftFactory {
-    use loop_starknet::interfaces::ITribesFactory;
-    use core::serde::Serde;
+    use OwnableComponent::InternalTrait;
     use core::num::traits::Zero;
-    use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait,};
+    use core::serde::Serde;
+    use loop_starknet::interfaces::ITribesFactory;
     use openzeppelin::access::ownable::OwnableComponent;
     use openzeppelin::introspection::src5::SRC5Component;
-    use OwnableComponent::InternalTrait;
-
+    use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use starknet::class_hash::ClassHash;
+    use starknet::storage::{
+        Map, MutableVecTrait, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
+        Vec, VecTrait,
+    };
+    use starknet::syscalls::deploy_syscall;
     use starknet::{
-        ContractAddress, get_caller_address, class_hash::ClassHash, syscalls::deploy_syscall,
-        SyscallResultTrait, get_block_timestamp, get_contract_address,
-        storage::{
-            Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess, Vec,
-            VecTrait, MutableVecTrait
-        }
+        ContractAddress, SyscallResultTrait, get_block_timestamp, get_caller_address,
+        get_contract_address,
     };
 
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
@@ -40,11 +41,12 @@ pub mod TribesNftFactory {
         src5: SRC5Component::Storage,
         #[substorage(v0)]
         ownable: OwnableComponent::Storage,
+        payment_token: ContractAddress,
     }
 
     #[derive(Clone, Drop, Serde, starknet::Store)]
     pub struct NFTMetadata {
-        symbol: ByteArray
+        symbol: ByteArray,
     }
 
     #[derive(Clone, Drop, Serde, starknet::Store)]
@@ -57,7 +59,7 @@ pub mod TribesNftFactory {
         pub created_at: u64,
         pub house_percentage: u32,
         pub artist_percentage: u32,
-        pub collection_info: ByteArray
+        pub collection_info: ByteArray,
     }
 
 
@@ -84,7 +86,7 @@ pub mod TribesNftFactory {
     #[derive(Drop, starknet::Event)]
     struct RoyaltiesUpdated {
         house_percentage: u32,
-        updated_at: u64
+        updated_at: u64,
     }
 
 
@@ -94,12 +96,14 @@ pub mod TribesNftFactory {
         owner: ContractAddress,
         house_percentage: u32,
         tribes_classhash: ClassHash,
+        payment_token: ContractAddress,
     ) {
         assert(owner.is_non_zero(), 'invalid owner or fee_collector');
         self.ownable.initializer(owner);
         self.house_percentage.write(house_percentage);
         self.owner.write(owner);
         self.tribes_nft_classhash.write(tribes_classhash);
+        self.payment_token.write(payment_token);
     }
 
     // #[abi_embed(v0)]
@@ -111,7 +115,7 @@ pub mod TribesNftFactory {
             pauser: ContractAddress,
             name: ByteArray,
             symbol: ByteArray,
-            collection_details: ByteArray
+            collection_details: ByteArray,
         ) -> ContractAddress {
             let symbol_taken = self.check_symbol_is_taken(symbol.clone());
             assert(!symbol_taken, 'symbol taken');
@@ -122,7 +126,7 @@ pub mod TribesNftFactory {
             let new_collections_count = collection_count + 1;
 
             let tribes_classhash = self.tribes_nft_classhash.read();
-
+            let payment_token = self.payment_token.read();
             let artist_percentage = 100 - house_percentage;
             let owner = self.owner.read();
             let mut tribes_constructor_calldata = ArrayTrait::new();
@@ -130,9 +134,11 @@ pub mod TribesNftFactory {
             name.serialize(ref tribes_constructor_calldata);
             symbol.serialize(ref tribes_constructor_calldata);
             owner.serialize(ref tribes_constructor_calldata);
+            payment_token.serialize(ref tribes_constructor_calldata);
+
 
             let (tribes_nft_address, _) = deploy_syscall(
-                tribes_classhash, 0, tribes_constructor_calldata.span(), true
+                tribes_classhash, 0, tribes_constructor_calldata.span(), true,
             )
                 .unwrap_syscall();
 
@@ -146,7 +152,7 @@ pub mod TribesNftFactory {
                 created_at: get_block_timestamp(),
                 house_percentage,
                 artist_percentage,
-                collection_info: collection_details
+                collection_info: collection_details,
             };
 
             let mut metadata: NFTMetadata = NFTMetadata { symbol: symbol.clone() };
@@ -164,7 +170,7 @@ pub mod TribesNftFactory {
                         contract_address: tribes_nft_address,
                         house_percentage,
                         artist_percentage,
-                    }
+                    },
                 );
 
             tribes_nft_address
@@ -178,8 +184,8 @@ pub mod TribesNftFactory {
             self
                 .emit(
                     RoyaltiesUpdated {
-                        house_percentage: new_house_percentage, updated_at: get_block_timestamp()
-                    }
+                        house_percentage: new_house_percentage, updated_at: get_block_timestamp(),
+                    },
                 );
         }
 
@@ -188,7 +194,7 @@ pub mod TribesNftFactory {
         }
 
         fn get_artist_collections(
-            self: @ContractState, artist: ContractAddress
+            self: @ContractState, artist: ContractAddress,
         ) -> Array<Collection> {
             let mut collection_arr = ArrayTrait::new();
 
@@ -210,17 +216,18 @@ pub mod TribesNftFactory {
             let mut collections_arr = ArrayTrait::new();
             let stored_collections = self.collections;
 
-            for i in 0
-                ..stored_collections
-                    .len() {
-                        collections_arr.append(self.collections.at(i).read());
-                    };
+            for i in 0..stored_collections.len() {
+                collections_arr.append(self.collections.at(i).read());
+            };
 
             collections_arr
         }
 
         fn withdraw(
-            ref self: ContractState, token: ContractAddress, receiver: ContractAddress, amount: u256
+            ref self: ContractState,
+            token: ContractAddress,
+            receiver: ContractAddress,
+            amount: u256,
         ) {
             self.ownable.assert_only_owner();
             assert(receiver.is_non_zero(), 'invalid receiver');
@@ -232,7 +239,10 @@ pub mod TribesNftFactory {
         }
 
         fn approve_user(
-            ref self: ContractState, token: ContractAddress, receiver: ContractAddress, amount: u256
+            ref self: ContractState,
+            token: ContractAddress,
+            receiver: ContractAddress,
+            amount: u256,
         ) {
             let caller = get_caller_address();
             assert(receiver.is_non_zero(), 'invalid receiver');
@@ -267,7 +277,7 @@ pub mod TribesNftFactory {
             // Check admin (contract) has enough balance
             assert(
                 erc20_dispatcher.balance_of(contract_address) >= amount,
-                'insufficient in Admin address'
+                'insufficient in Admin address',
             );
 
             // Transfer to user
@@ -292,7 +302,7 @@ pub mod TribesNftFactory {
             while i != all_metadata.len() {
                 if all_metadata.at(i).read().symbol == symbol {
                     taken = true;
-                };
+                }
                 i += 1;
             };
 

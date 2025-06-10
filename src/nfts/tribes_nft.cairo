@@ -3,19 +3,19 @@ const MINTER_ROLE: felt252 = selector!("MINTER_ROLE");
 
 #[starknet::contract]
 pub mod TribesNFT {
-    use starknet::{ContractAddress, get_caller_address, get_contract_address, get_block_timestamp};
-    use starknet::storage::{
-        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
-        StoragePointerWriteAccess,
-    };
     use core::num::traits::Zero;
+    use loop_starknet::interfaces::IERC721;
     use openzeppelin::access::accesscontrol::AccessControlComponent;
     use openzeppelin::introspection::src5::SRC5Component;
     use openzeppelin::security::pausable::PausableComponent;
     use openzeppelin::token::erc721::ERC721Component;
-    use openzeppelin_token::erc20::{ERC20ABIDispatcher, ERC20ABIDispatcherTrait};
-    use super::{PAUSER_ROLE, MINTER_ROLE};
-    use loop_starknet::interfaces::IERC721;
+    use openzeppelin::token::erc20::{ERC20ABIDispatcher, ERC20ABIDispatcherTrait};
+    use starknet::storage::{
+        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
+        StoragePointerWriteAccess,
+    };
+    use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_contract_address};
+    use super::{MINTER_ROLE, PAUSER_ROLE};
 
     component!(path: ERC721Component, storage: erc721, event: ERC721Event);
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
@@ -52,6 +52,8 @@ pub mod TribesNFT {
         whitelist: Map<ContractAddress, bool>,
         expiry_date: Map<u256, u64>,
         pause: bool,
+        subscription_amount: u256,
+        payment_token: ContractAddress,
     }
 
     #[event]
@@ -92,11 +94,14 @@ pub mod TribesNFT {
         name: ByteArray,
         symbol: ByteArray,
         authorized_address: ContractAddress,
+        payment_token: ContractAddress,
     ) {
         self.erc721.initializer(name, symbol, "");
         self.accesscontrol.initializer();
         self.accesscontrol._grant_role(PAUSER_ROLE, pauser);
         self.authorized_address.write(authorized_address);
+        self.subscription_amount.write(20);
+        self.payment_token.write(payment_token);
     }
 
     impl ERC721HooksImpl of ERC721Component::ERC721HooksTrait<ContractState> {
@@ -146,19 +151,59 @@ pub mod TribesNFT {
             expired
         }
 
-        fn mint_ticket_nft(ref self: ContractState, recipient: ContractAddress) -> u256 {
-            let is_whitelisted = self.whitelist.read(recipient);
+        fn mint_ticket_nft(
+            ref self: ContractState,
+            payment_amount: u256,
+            artist_address: ContractAddress,
+        ) -> u256 {
             let caller = get_caller_address();
+            let is_whitelisted = self.whitelist.read(caller);
             let timestamp = get_block_timestamp();
             let thirty_days = 2592000;
             let expiry_date = timestamp + thirty_days;
+            let payment_token = self.payment_token.read();
             assert(is_whitelisted, 'Not Whitelisted');
-            let balance = self.erc721.balance_of(recipient);
+            let balance = self.erc721.balance_of(caller);
             assert(balance.is_zero(), 'ALREADY_MINTED');
 
-            let token_id = self.next_token_id.read() + 1;
+            assert(payment_token.is_non_zero(), 'Invalid payment token');
+            assert(payment_amount > 0, 'Invalid payment amount');
+            assert(artist_address.is_non_zero(), 'Invalid artist address');
+            let subscription_amount = self.subscription_amount.read();
+            assert(subscription_amount == payment_amount, 'Invalid fee');
+                
+            let erc20_dispatcher = ERC20ABIDispatcher { contract_address: payment_token };
+            let contract_address = get_contract_address();
 
-            self._mint(recipient, token_id);
+            let user_balance = erc20_dispatcher.balance_of(caller);
+            assert(user_balance >= payment_amount, 'Insufficient balance');
+
+
+            let transfer_success = erc20_dispatcher.transfer_from(caller, contract_address, payment_amount);
+            assert(transfer_success, 'Payment transfer faield');
+
+            // Distributing payment 
+            let (artist_share, treasury_share) = self.calculate_fee(payment_amount);
+            let treasury_address = self.authorized_address.read();
+            
+            let artist_transfer = erc20_dispatcher.transfer_from(caller, artist_address, artist_share);
+            assert(artist_transfer, 'Artist payment failed');
+
+            let treasury_transfer = erc20_dispatcher.transfer_from(caller, treasury_address, treasury_share);
+            assert(treasury_transfer, 'Treasury payment failed');
+
+            // let artist_transfer = erc20_dispatcher.transfer(artist_address, artist_share);
+            // assert(artist_transfer, 'Artist payment failed');
+
+            // let treasury_transfer = erc20_dispatcher.transfer(treasury_address, treasury_share);
+            // assert(treasury_transfer, 'Treasury payment failed');
+
+
+            self.whitelist.write(caller, true);
+            
+            let token_id = self.next_token_id.read();
+            
+            self._mint(caller, token_id);
             self.expiry_date.write(token_id, expiry_date);
             self.next_token_id.write(token_id);
             self.emit(PassMinted { owner: caller, token_id: token_id });
@@ -208,7 +253,10 @@ pub mod TribesNFT {
         }
 
         fn withdraw(
-            ref self: ContractState, receiver: ContractAddress, token: ContractAddress, amount: u256
+            ref self: ContractState,
+            receiver: ContractAddress,
+            token: ContractAddress,
+            amount: u256,
         ) {
             self.accesscontrol.assert_only_role(PAUSER_ROLE);
             let paused: bool = self.pause.read();
@@ -216,18 +264,26 @@ pub mod TribesNFT {
             assert(receiver.is_non_zero(), 'invalid receiver');
             let erc20_dispatcher = ERC20ABIDispatcher { contract_address: token };
             assert(
-                amount >= erc20_dispatcher.balance_of(get_contract_address()), 'insufficient bal'
+                amount >= erc20_dispatcher.balance_of(get_contract_address()), 'insufficient bal',
             );
             erc20_dispatcher.transfer(receiver, amount);
             self.emit(Message { message: 'Withdraw Successful' });
         }
 
-        fn check_balance(self: @ContractState, token: ContractAddress,) -> u256 {
+        fn check_balance(self: @ContractState, token: ContractAddress) -> u256 {
             self.accesscontrol.assert_only_role(PAUSER_ROLE);
 
             let erc20_dispatcher = ERC20ABIDispatcher { contract_address: token };
             let balance = erc20_dispatcher.balance_of(get_contract_address());
             balance
+        }
+
+        fn calculate_fee(self: @ContractState, payment_amount: u256) -> (u256, u256) {
+            let artist_percentage: u256 = 80;
+
+            let artist_share = (payment_amount * artist_percentage)/100;
+            let treasury_share = payment_amount - artist_share;
+            (artist_share, treasury_share)
         }
     }
 
@@ -236,7 +292,7 @@ pub mod TribesNFT {
     #[abi(per_item)]
     impl ExternalImpl of ExternalTrait {
         #[external(v0)]
-        fn _mint(ref self: ContractState, recipient: ContractAddress, token_id: u256,) {
+        fn _mint(ref self: ContractState, recipient: ContractAddress, token_id: u256) {
             // self.accesscontrol.assert_only_role(MINTER_ROLE);
             self.erc721.mint(recipient, token_id);
         }
