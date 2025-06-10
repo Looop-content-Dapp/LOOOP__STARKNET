@@ -1,19 +1,18 @@
-use starknet::{ContractAddress, contract_address_const, ClassHash, get_block_timestamp};
+use core::num::traits::Zero;
+use loop_starknet::factory::TribesNftFactory;
+use loop_starknet::interfaces::{
+    IERC721Dispatcher, IERC721DispatcherTrait, ITribesFactoryDispatcher,
+    ITribesFactoryDispatcherTrait, IUSDCTokenDispatcher, IUSDCTokenDispatcherTrait,
+};
+use loop_starknet::mockUSDC::USDC;
+use loop_starknet::nfts::tribes_nft::TribesNFT;
 use openzeppelin::token::erc721::{ERC721ABIDispatcher, ERC721ABIDispatcherTrait};
 // use openzeppelin::token::erc20::{ERC20ABIDispatcher, ERC20ABIDispatcherTrait};
 use snforge_std::{
-    declare, ContractClassTrait, DeclareResultTrait, start_cheat_caller_address,
-    stop_cheat_caller_address, start_cheat_block_timestamp, stop_cheat_block_timestamp
+    ContractClassTrait, DeclareResultTrait, declare, start_cheat_block_timestamp,
+    start_cheat_caller_address, stop_cheat_block_timestamp, stop_cheat_caller_address,
 };
-use core::num::traits::Zero;
-use loop_starknet::mockUSDC::USDC;
-use loop_starknet::factory::TribesNftFactory;
-
-use loop_starknet::nfts::tribes_nft::TribesNFT;
-use loop_starknet::interfaces::{
-    ITribesFactoryDispatcher, ITribesFactoryDispatcherTrait, IUSDCTokenDispatcher,
-    IUSDCTokenDispatcherTrait, IERC721Dispatcher, IERC721DispatcherTrait
-};
+use starknet::{ClassHash, ContractAddress, contract_address_const, get_block_timestamp};
 
 
 fn deploy_factory_contract() -> ContractAddress {
@@ -53,14 +52,14 @@ fn test_create_collection() {
 
     start_cheat_caller_address(factory_address, pauser);
     let tribes_nft_address = factory_dispatcher
-        .create_collection(pauser, name, symbol, collection_details,);
+        .create_collection(pauser, name, symbol, collection_details);
     stop_cheat_caller_address(factory_address);
 
     assert!(tribes_nft_address.is_non_zero(), "NFT address is zero");
 }
 
 fn create_test_collection(
-    factory_address: ContractAddress, pauser: ContractAddress
+    factory_address: ContractAddress, pauser: ContractAddress,
 ) -> ContractAddress {
     let name = "TestCollection";
     let symbol = "TEST";
@@ -71,7 +70,7 @@ fn create_test_collection(
 
     start_cheat_caller_address(factory_address, pauser);
     let tribes_nft_address = factory_dispatcher
-        .create_collection(pauser, name, symbol, collection_details,);
+        .create_collection(pauser, name, symbol, collection_details);
     stop_cheat_caller_address(factory_address);
 
     tribes_nft_address
@@ -126,7 +125,7 @@ fn test_get_artist_collections() {
     let collection_details: ByteArray = "Second test collection";
 
     start_cheat_caller_address(factory_address, artist1);
-    factory_dispatcher.create_collection(artist2, name, symbol, collection_details,);
+    factory_dispatcher.create_collection(artist2, name, symbol, collection_details);
     stop_cheat_caller_address(factory_address);
 
     // Get artist1 collections
@@ -175,7 +174,7 @@ fn test_get_all_collections() {
     let collection_details: ByteArray = "Second test collection";
 
     start_cheat_caller_address(factory_address, artist);
-    factory_dispatcher.create_collection(artist, name, symbol, collection_details,);
+    factory_dispatcher.create_collection(artist, name, symbol, collection_details);
     stop_cheat_caller_address(factory_address);
 
     // Verify the collection was added
@@ -205,14 +204,14 @@ fn test_symbol_should_panic() {
 
     start_cheat_caller_address(factory_address, artist);
     factory_dispatcher
-        .create_collection(artist, name.clone(), symbol.clone(), collection_details.clone(),);
+        .create_collection(artist, name.clone(), symbol.clone(), collection_details.clone());
 
     // Try creating another collection with the same symbol (should fail)
     let name2: ByteArray = "SecondCollection";
     factory_dispatcher
         .create_collection(
             artist, name2.clone(), symbol.clone(), // Same symbol
-             collection_details.clone(),
+            collection_details.clone(),
         );
     stop_cheat_caller_address(factory_address);
 }
@@ -234,7 +233,7 @@ fn test_mint_pass_without_been_whitelisted() {
 
     start_cheat_caller_address(factory_address, pauser);
     let tribes_nft_address = factory_dispatcher
-        .create_collection(pauser, name, symbol, collection_details,);
+        .create_collection(pauser, name, symbol, collection_details);
     let trybe_nft = IERC721Dispatcher { contract_address: tribes_nft_address };
     trybe_nft.mint_ticket_nft(pauser);
 
@@ -257,7 +256,7 @@ fn test_mint_pass() {
 
     start_cheat_caller_address(factory_address, pauser);
     let tribes_nft_address = factory_dispatcher
-        .create_collection(pauser, name, symbol, collection_details,);
+        .create_collection(pauser, name, symbol, collection_details);
     stop_cheat_caller_address(factory_address);
 
     let nft_dispatcher = IERC721Dispatcher { contract_address: tribes_nft_address };
@@ -286,7 +285,7 @@ fn test_mint_pass_when_paused() {
 
     start_cheat_caller_address(factory_address, pauser);
     let tribes_nft_address = factory_dispatcher
-        .create_collection(pauser, name, symbol, collection_details,);
+        .create_collection(pauser, name, symbol, collection_details);
     stop_cheat_caller_address(factory_address);
 
     let nft_dispatcher = IERC721Dispatcher { contract_address: tribes_nft_address };
@@ -319,7 +318,7 @@ fn test_mint_pass_when_unpaused() {
 
     start_cheat_caller_address(factory_address, pauser);
     let tribes_nft_address = factory_dispatcher
-        .create_collection(pauser, name, symbol, collection_details,);
+        .create_collection(pauser, name, symbol, collection_details);
     stop_cheat_caller_address(factory_address);
 
     let nft_dispatcher = IERC721Dispatcher { contract_address: tribes_nft_address };
