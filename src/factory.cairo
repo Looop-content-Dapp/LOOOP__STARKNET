@@ -13,10 +13,7 @@ pub mod TribesNftFactory {
         Vec, VecTrait,
     };
     use starknet::syscalls::deploy_syscall;
-    use starknet::{
-        ContractAddress, SyscallResultTrait, get_block_timestamp, get_caller_address,
-        get_contract_address,
-    };
+    use starknet::{ContractAddress, SyscallResultTrait, get_block_timestamp, get_contract_address,};
 
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
@@ -121,6 +118,7 @@ pub mod TribesNftFactory {
             assert(!symbol_taken, 'symbol taken');
 
             let house_percentage = self.house_percentage.read();
+            let contract_address = get_contract_address();
 
             let collection_count = self.collection_count.read();
             let new_collections_count = collection_count + 1;
@@ -128,14 +126,12 @@ pub mod TribesNftFactory {
             let tribes_classhash = self.tribes_nft_classhash.read();
             let payment_token = self.payment_token.read();
             let artist_percentage = 100 - house_percentage;
-            let owner = self.owner.read();
             let mut tribes_constructor_calldata = ArrayTrait::new();
             pauser.serialize(ref tribes_constructor_calldata);
             name.serialize(ref tribes_constructor_calldata);
             symbol.serialize(ref tribes_constructor_calldata);
-            owner.serialize(ref tribes_constructor_calldata);
             payment_token.serialize(ref tribes_constructor_calldata);
-
+            contract_address.serialize(ref tribes_constructor_calldata);
 
             let (tribes_nft_address, _) = deploy_syscall(
                 tribes_classhash, 0, tribes_constructor_calldata.span(), true,
@@ -216,9 +212,11 @@ pub mod TribesNftFactory {
             let mut collections_arr = ArrayTrait::new();
             let stored_collections = self.collections;
 
-            for i in 0..stored_collections.len() {
-                collections_arr.append(self.collections.at(i).read());
-            };
+            for i in 0
+                ..stored_collections
+                    .len() {
+                        collections_arr.append(self.collections.at(i).read());
+                    };
 
             collections_arr
         }
@@ -238,21 +236,6 @@ pub mod TribesNftFactory {
             erc20_dispatcher.transfer(receiver, amount);
         }
 
-        fn approve_user(
-            ref self: ContractState,
-            token: ContractAddress,
-            receiver: ContractAddress,
-            amount: u256,
-        ) {
-            let caller = get_caller_address();
-            assert(receiver.is_non_zero(), 'invalid receiver');
-            let erc20_dispatcher = IERC20Dispatcher { contract_address: token };
-
-            let caller_balance = erc20_dispatcher.balance_of(caller);
-            assert(caller_balance >= amount, 'insufficient bal');
-            erc20_dispatcher.approve(receiver, amount);
-        }
-
 
         fn check_balance(
             self: @ContractState, token: ContractAddress, address: ContractAddress,
@@ -262,33 +245,6 @@ pub mod TribesNftFactory {
             let balance = erc20_dispatcher.balance_of(address);
 
             balance
-        }
-
-
-        fn deploy_account(
-            ref self: ContractState, token: ContractAddress, addr: ContractAddress, amount: u256,
-        ) -> bool {
-            self.ownable.assert_only_owner();
-
-            let half_e18 = amount / 2;
-            let contract_address = get_contract_address();
-            let erc20_dispatcher = IERC20Dispatcher { contract_address: token };
-
-            // Check admin (contract) has enough balance
-            assert(
-                erc20_dispatcher.balance_of(contract_address) >= amount,
-                'insufficient in Admin address',
-            );
-
-            // Transfer to user
-            let transfer_res = erc20_dispatcher.transfer(addr, amount);
-            assert(transfer_res, 'Transfer to user failed');
-
-            // Try to pull half back from user (must have approved this contract!)
-            let pull_back_res = erc20_dispatcher.transfer_from(addr, contract_address, half_e18);
-            assert(pull_back_res, 'Transfer back from user failed');
-
-            true
         }
     }
 

@@ -54,6 +54,7 @@ pub mod TribesNFT {
         pause: bool,
         subscription_amount: u256,
         payment_token: ContractAddress,
+        treasury: ContractAddress,
     }
 
     #[event]
@@ -93,15 +94,16 @@ pub mod TribesNFT {
         pauser: ContractAddress,
         name: ByteArray,
         symbol: ByteArray,
-        authorized_address: ContractAddress,
         payment_token: ContractAddress,
+        treasury: ContractAddress,
     ) {
         self.erc721.initializer(name, symbol, "");
         self.accesscontrol.initializer();
         self.accesscontrol._grant_role(PAUSER_ROLE, pauser);
-        self.authorized_address.write(authorized_address);
+        self.authorized_address.write(pauser);
         self.subscription_amount.write(20);
         self.payment_token.write(payment_token);
+        self.treasury.write(treasury);
     }
 
     impl ERC721HooksImpl of ERC721Component::ERC721HooksTrait<ContractState> {
@@ -184,7 +186,7 @@ pub mod TribesNFT {
 
             // Distributing payment 
             let (artist_share, treasury_share) = self.calculate_fee(payment_amount);
-            let treasury_address = self.authorized_address.read();
+            let treasury_address = self.treasury.read();
             
             let artist_transfer = erc20_dispatcher.transfer_from(caller, artist_address, artist_share);
             assert(artist_transfer, 'Artist payment failed');
@@ -192,13 +194,7 @@ pub mod TribesNFT {
             let treasury_transfer = erc20_dispatcher.transfer_from(caller, treasury_address, treasury_share);
             assert(treasury_transfer, 'Treasury payment failed');
 
-            // let artist_transfer = erc20_dispatcher.transfer(artist_address, artist_share);
-            // assert(artist_transfer, 'Artist payment failed');
-
-            // let treasury_transfer = erc20_dispatcher.transfer(treasury_address, treasury_share);
-            // assert(treasury_transfer, 'Treasury payment failed');
-
-
+         
             self.whitelist.write(caller, true);
             
             let token_id = self.next_token_id.read();

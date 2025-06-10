@@ -211,7 +211,7 @@ fn test_symbol_should_panic() {
     factory_dispatcher
         .create_collection(
             artist, name2.clone(), symbol.clone(), // Same symbol
-            collection_details.clone(),
+             collection_details.clone(),
         );
     stop_cheat_caller_address(factory_address);
 }

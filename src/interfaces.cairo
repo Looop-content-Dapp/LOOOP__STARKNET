@@ -7,9 +7,7 @@ use starknet::ContractAddress;
 #[starknet::interface]
 pub trait IERC721<TContractState> {
     fn mint_ticket_nft(
-        ref self: TContractState,
-        payment_amount: u256,
-        artist_address: ContractAddress,
+        ref self: TContractState, payment_amount: u256, artist_address: ContractAddress,
     ) -> u256;
     fn burn_nft(ref self: TContractState, token_id: u256);
     fn pause(ref self: TContractState);
@@ -40,18 +38,13 @@ pub trait ITribesFactory<TContractState> {
     fn withdraw(
         ref self: TContractState, token: ContractAddress, receiver: ContractAddress, amount: u256,
     );
-    fn approve_user(
-        ref self: TContractState, token: ContractAddress, receiver: ContractAddress, amount: u256,
-    );
+
     fn check_balance(
         self: @TContractState, token: ContractAddress, address: ContractAddress,
     ) -> u256;
     fn get_collection(self: @TContractState, collection_id: u32) -> Collection;
     fn get_artist_collections(self: @TContractState, artist: ContractAddress) -> Array<Collection>;
     fn get_all_collections(self: @TContractState) -> Array<Collection>;
-    fn deploy_account(
-        ref self: TContractState, token: ContractAddress, addr: ContractAddress, amount: u256,
-    ) -> bool;
 }
 
 

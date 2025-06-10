@@ -4,6 +4,14 @@ This document outlines the declaration and deployment information for the **Tryb
 
 ---
 
+Mock usdc class hash : 0x01f3003c05accef1f32470f2aa088506544696180d236959971eefabe482833c
+contract_address: 0x0475e85c9f471885c1624c297862df9aaffa82ad55c7d1fde1ac892232445e06
+transaction_hash: 0x0693ebed6ffaf37d9740a171f7ca0a362a205b78516762105603c797236ff045
+
+To see deployment details, visit:
+contract: https://sepolia.starkscan.co/contract/0x0475e85c9f471885c1624c297862df9aaffa82ad55c7d1fde1ac892232445e06
+transaction: https://sepolia.starkscan.co/tx/0x0693ebed6ffaf37d9740a171f7ca0a362a205b78516762105603c797236ff045
+
 ## 📦 Trybenft Class Declaration
 
 - **Command**: `declare`
@@ -25,9 +33,9 @@ This document outlines the declaration and deployment information for the **Tryb
 
 - **Command**: `declare`
 - **Class Hash**:  
-  `0x020073bafce0c00450558ed71e9d69493f816a05e5929ef688f6ad1e7cd7d0c4`
+  `0x0062ba8dfbc16e6a465907436ebe00684608e47743db277b458a6a01849103f9`
 - **Transaction Hash**:  
-  `0x0594ffded275b275a25ea6c67eac10ffe96433708616a88f495db9cd6f1b3e1c`
+  `0x01195e485cb74a463ab557a179b266461782fb2e51f6de67503e02c56fb474a2`
 
 ### Deployment
 
