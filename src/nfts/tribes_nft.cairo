@@ -96,11 +96,12 @@ pub mod TribesNFT {
         symbol: ByteArray,
         payment_token: ContractAddress,
         treasury: ContractAddress,
+        caller: ContractAddress,
     ) {
         self.erc721.initializer(name, symbol, "");
         self.accesscontrol.initializer();
         self.accesscontrol._grant_role(PAUSER_ROLE, pauser);
-        self.authorized_address.write(pauser);
+        self.authorized_address.write(caller);
         self.subscription_amount.write(20);
         self.payment_token.write(payment_token);
         self.treasury.write(treasury);
@@ -154,9 +155,7 @@ pub mod TribesNFT {
         }
 
         fn mint_ticket_nft(
-            ref self: ContractState,
-            payment_amount: u256,
-            artist_address: ContractAddress,
+            ref self: ContractState, payment_amount: u256, artist_address: ContractAddress,
         ) -> u256 {
             let caller = get_caller_address();
             let is_whitelisted = self.whitelist.read(caller);
@@ -173,38 +172,38 @@ pub mod TribesNFT {
             assert(artist_address.is_non_zero(), 'Invalid artist address');
             let subscription_amount = self.subscription_amount.read();
             assert(subscription_amount == payment_amount, 'Invalid fee');
-                
+
             let erc20_dispatcher = ERC20ABIDispatcher { contract_address: payment_token };
             let contract_address = get_contract_address();
 
             let user_balance = erc20_dispatcher.balance_of(caller);
             assert(user_balance >= payment_amount, 'Insufficient balance');
 
-
-            let transfer_success = erc20_dispatcher.transfer_from(caller, contract_address, payment_amount);
+            let transfer_success = erc20_dispatcher
+                .transfer_from(caller, contract_address, payment_amount);
             assert(transfer_success, 'Payment transfer faield');
 
-            // Distributing payment 
+            // Distributing payment (from contract, not caller)
             let (artist_share, treasury_share) = self.calculate_fee(payment_amount);
             let treasury_address = self.treasury.read();
-            
-            let artist_transfer = erc20_dispatcher.transfer_from(caller, artist_address, artist_share);
+
+            let artist_transfer = erc20_dispatcher.transfer(artist_address, artist_share);
             assert(artist_transfer, 'Artist payment failed');
 
-            let treasury_transfer = erc20_dispatcher.transfer_from(caller, treasury_address, treasury_share);
+            let treasury_transfer = erc20_dispatcher.transfer(treasury_address, treasury_share);
             assert(treasury_transfer, 'Treasury payment failed');
 
-         
-            self.whitelist.write(caller, true);
-            
+            // self.whitelist.write(caller, false); // Optional, only if re-whitelisting
+
             let token_id = self.next_token_id.read();
-            
+
             self._mint(caller, token_id);
             self.expiry_date.write(token_id, expiry_date);
-            self.next_token_id.write(token_id);
+            self.next_token_id.write(token_id + 1);
             self.emit(PassMinted { owner: caller, token_id: token_id });
             token_id
         }
+
 
         fn pause(ref self: ContractState) {
             let caller = get_caller_address();
@@ -277,7 +276,7 @@ pub mod TribesNFT {
         fn calculate_fee(self: @ContractState, payment_amount: u256) -> (u256, u256) {
             let artist_percentage: u256 = 80;
 
-            let artist_share = (payment_amount * artist_percentage)/100;
+            let artist_share = (payment_amount * artist_percentage) / 100;
             let treasury_share = payment_amount - artist_share;
             (artist_share, treasury_share)
         }

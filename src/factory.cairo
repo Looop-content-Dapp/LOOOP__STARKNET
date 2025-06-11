@@ -13,7 +13,10 @@ pub mod TribesNftFactory {
         Vec, VecTrait,
     };
     use starknet::syscalls::deploy_syscall;
-    use starknet::{ContractAddress, SyscallResultTrait, get_block_timestamp, get_contract_address,};
+    use starknet::{
+        ContractAddress, SyscallResultTrait, get_caller_address, get_block_timestamp,
+        get_contract_address,
+    };
 
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
@@ -119,6 +122,7 @@ pub mod TribesNftFactory {
 
             let house_percentage = self.house_percentage.read();
             let contract_address = get_contract_address();
+            let caller = get_caller_address();
 
             let collection_count = self.collection_count.read();
             let new_collections_count = collection_count + 1;
@@ -132,6 +136,7 @@ pub mod TribesNftFactory {
             symbol.serialize(ref tribes_constructor_calldata);
             payment_token.serialize(ref tribes_constructor_calldata);
             contract_address.serialize(ref tribes_constructor_calldata);
+            caller.serialize(ref tribes_constructor_calldata);
 
             let (tribes_nft_address, _) = deploy_syscall(
                 tribes_classhash, 0, tribes_constructor_calldata.span(), true,
