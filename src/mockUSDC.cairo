@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: MIT
 use starknet::ContractAddress;
 
-#[starknet::interface]
-pub trait IExternal<ContractState> {
-    fn mint(ref self: ContractState, recipient: ContractAddress, amount: u256);
-}
 #[starknet::contract]
 pub mod MockUsdc {
     use openzeppelin::access::ownable::OwnableComponent;
     use openzeppelin::token::erc20::interface::IERC20Metadata;
     use openzeppelin::token::erc20::{ERC20Component, ERC20HooksEmptyImpl};
+    use loop_starknet::interfaces::IExternal;
     use starknet::ContractAddress;
 
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess,};
@@ -66,7 +63,7 @@ pub mod MockUsdc {
     impl OwnableInternalImpl = OwnableComponent::InternalImpl<ContractState>;
 
     #[abi(embed_v0)]
-    impl ExternalImpl of super::IExternal<ContractState> {
+    impl ExternalImpl of IExternal<ContractState> {
         fn mint(ref self: ContractState, recipient: ContractAddress, amount: u256) {
             self.erc20.mint(recipient, amount);
         }

@@ -7,7 +7,7 @@ use starknet::ContractAddress;
 #[starknet::interface]
 pub trait IERC721<TContractState> {
     fn mint_ticket_nft(
-        ref self: TContractState, payment_amount: u256, artist_address: ContractAddress,
+        ref self: TContractState, payment_amount: u256, payment_token: ContractAddress
     ) -> u256;
     fn burn_nft(ref self: TContractState, token_id: u256);
     fn pause(ref self: TContractState);
@@ -22,8 +22,13 @@ pub trait IERC721<TContractState> {
     fn has_expired(ref self: TContractState, token_id: u256) -> bool;
     fn pass_expiry_date(self: @TContractState, token_id: u256) -> u64;
     fn calculate_fee(self: @TContractState, payment_amount: u256) -> (u256, u256);
+    fn owner(self: @TContractState, address: ContractAddress, token_id: u256) -> bool;
 }
 
+#[starknet::interface]
+pub trait IExternal<ContractState> {
+    fn mint(ref self: ContractState, recipient: ContractAddress, amount: u256);
+}
 
 #[starknet::interface]
 pub trait ITribesFactory<TContractState> {

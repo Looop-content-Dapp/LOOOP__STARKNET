@@ -1,7 +1,9 @@
 const PAUSER_ROLE: felt252 = selector!("PAUSER_ROLE");
 const MINTER_ROLE: felt252 = selector!("MINTER_ROLE");
 
-#[starknet::contract]
+#[starknet::contract] // use loop_starknet::vault::Vault::{
+//     PassStatus, PassDetails, ArtistDetails, TribePassValidity, TribeDetails
+// };
 pub mod TribesNFT {
     use core::num::traits::Zero;
     use loop_starknet::interfaces::IERC721;
@@ -10,6 +12,7 @@ pub mod TribesNFT {
     use openzeppelin::security::pausable::PausableComponent;
     use openzeppelin::token::erc721::ERC721Component;
     use openzeppelin::token::erc20::{ERC20ABIDispatcher, ERC20ABIDispatcherTrait};
+    use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
         StoragePointerWriteAccess,
@@ -155,29 +158,32 @@ pub mod TribesNFT {
         }
 
         fn mint_ticket_nft(
-            ref self: ContractState, payment_amount: u256, artist_address: ContractAddress,
+            ref self: ContractState, payment_amount: u256, payment_token: ContractAddress
         ) -> u256 {
+            let artist_address = get_contract_address();
             let caller = get_caller_address();
             let is_whitelisted = self.whitelist.read(caller);
             let timestamp = get_block_timestamp();
             let thirty_days = 2592000;
             let expiry_date = timestamp + thirty_days;
-            let payment_token = self.payment_token.read();
+            // let payment_token = self.payment_token.read();
             assert(is_whitelisted, 'Not Whitelisted');
             let balance = self.erc721.balance_of(caller);
             assert(balance.is_zero(), 'ALREADY_MINTED');
 
-            assert(payment_token.is_non_zero(), 'Invalid payment token');
+            // assert(payment_token.is_non_zero(), 'Invalid payment token');
             assert(payment_amount > 0, 'Invalid payment amount');
             assert(artist_address.is_non_zero(), 'Invalid artist address');
             let subscription_amount = self.subscription_amount.read();
             assert(subscription_amount == payment_amount, 'Invalid fee');
 
-            let erc20_dispatcher = ERC20ABIDispatcher { contract_address: payment_token };
+            // let erc20_dispatcher = ERC20ABIDispatcher { contract_address: payment_token };
+            let erc20_dispatcher = IERC20Dispatcher { contract_address: payment_token };
+
             let contract_address = get_contract_address();
 
-            let user_balance = erc20_dispatcher.balance_of(caller);
-            assert(user_balance >= payment_amount, 'Insufficient balance');
+            // let user_balance = erc20_dispatcher.balance_of(caller);
+            // assert(user_balance >= payment_amount, 'Insufficient balance');
 
             let transfer_success = erc20_dispatcher
                 .transfer_from(caller, contract_address, payment_amount);
@@ -279,6 +285,12 @@ pub mod TribesNFT {
             let artist_share = (payment_amount * artist_percentage) / 100;
             let treasury_share = payment_amount - artist_share;
             (artist_share, treasury_share)
+        }
+
+        fn owner(self: @ContractState, address: ContractAddress, token_id: u256) -> bool {
+            let owner = self.erc721.owner_of(token_id);
+            let success = owner == address;
+            success
         }
     }
 
