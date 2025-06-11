@@ -8,11 +8,12 @@ pub trait IExternal<ContractState> {
 #[starknet::contract]
 pub mod AquaCoin {
     use openzeppelin::access::ownable::OwnableComponent;
-    use openzeppelin::token::erc20::interface::IERC20Metadata;
+    use openzeppelin::token::erc20::interface::{
+        IERC20Dispatcher, IERC20DispatcherTrait, IERC20Metadata,
+    };
     use openzeppelin::token::erc20::{ERC20Component, ERC20HooksEmptyImpl};
-    use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
-    use starknet::{ContractAddress, get_contract_address};
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
+    use starknet::{ContractAddress, get_contract_address};
     component!(path: ERC20Component, storage: erc20, event: ERC20Event);
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
 
