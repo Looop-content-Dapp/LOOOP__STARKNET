@@ -105,7 +105,7 @@ pub mod TribesNFT {
         self.accesscontrol.initializer();
         self.accesscontrol._grant_role(PAUSER_ROLE, pauser);
         self.authorized_address.write(caller);
-        self.subscription_amount.write(20);
+
         self.payment_token.write(payment_token);
         self.treasury.write(treasury);
     }
@@ -269,6 +269,12 @@ pub mod TribesNFT {
             );
             erc20_dispatcher.transfer(receiver, amount);
             self.emit(Message { message: 'Withdraw Successful' });
+        }
+        fn set_subscription_fee(ref self: ContractState, amount: u256) {
+            let caller = get_caller_address();
+            let authorized_address = self.authorized_address.read();
+            assert(caller == authorized_address, 'User Not Authorized');
+            self.subscription_amount.write(amount);
         }
 
         fn check_balance(self: @ContractState, token: ContractAddress) -> u256 {

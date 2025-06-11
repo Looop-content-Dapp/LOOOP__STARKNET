@@ -233,6 +233,8 @@ fn test_mint_pass() {
     start_cheat_caller_address(tribes_nft_address, pauser);
     nft_dispatcher.whitelist_address(pauser);
 
+    nft_dispatcher.set_subscription_fee(20);
+
     let token_id = nft_dispatcher.mint_ticket_nft(20, erc20_address);
     stop_cheat_caller_address(tribes_nft_address);
 
