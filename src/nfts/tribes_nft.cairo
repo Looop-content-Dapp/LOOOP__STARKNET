@@ -10,9 +10,9 @@ pub mod TribesNFT {
     use openzeppelin::access::accesscontrol::AccessControlComponent;
     use openzeppelin::introspection::src5::SRC5Component;
     use openzeppelin::security::pausable::PausableComponent;
-    use openzeppelin::token::erc721::ERC721Component;
-    use openzeppelin::token::erc20::{ERC20ABIDispatcher, ERC20ABIDispatcherTrait};
     use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use openzeppelin::token::erc20::{ERC20ABIDispatcher, ERC20ABIDispatcherTrait};
+    use openzeppelin::token::erc721::ERC721Component;
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
         StoragePointerWriteAccess,
@@ -158,7 +158,7 @@ pub mod TribesNFT {
         }
 
         fn mint_ticket_nft(
-            ref self: ContractState, payment_amount: u256, payment_token: ContractAddress
+            ref self: ContractState, payment_amount: u256, payment_token: ContractAddress,
         ) -> u256 {
             let artist_address = get_contract_address();
             let caller = get_caller_address();

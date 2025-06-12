@@ -1,8 +1,8 @@
 use core::num::traits::Zero;
 use loop_starknet::factory::TribesNftFactory;
 use loop_starknet::interfaces::{
-    IERC721Dispatcher, IERC721DispatcherTrait, ITribesFactoryDispatcher,
-    ITribesFactoryDispatcherTrait, IExternalDispatcher, IExternalDispatcherTrait
+    IERC721Dispatcher, IERC721DispatcherTrait, IExternalDispatcher, IExternalDispatcherTrait,
+    ITribesFactoryDispatcher, ITribesFactoryDispatcherTrait,
 };
 use loop_starknet::nfts::tribes_nft::TribesNFT;
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
@@ -278,7 +278,7 @@ fn test_symbol_should_panic() {
     factory_dispatcher
         .create_collection(
             artist, name2.clone(), symbol.clone(), // Same symbol
-             collection_details.clone(),
+            collection_details.clone(),
         );
     stop_cheat_caller_address(factory_address);
 }

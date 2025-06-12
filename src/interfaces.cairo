@@ -7,7 +7,7 @@ use starknet::ContractAddress;
 #[starknet::interface]
 pub trait IERC721<TContractState> {
     fn mint_ticket_nft(
-        ref self: TContractState, payment_amount: u256, payment_token: ContractAddress
+        ref self: TContractState, payment_amount: u256, payment_token: ContractAddress,
     ) -> u256;
     fn burn_nft(ref self: TContractState, token_id: u256);
     fn pause(ref self: TContractState);
