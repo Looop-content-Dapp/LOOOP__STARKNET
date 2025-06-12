@@ -14,7 +14,7 @@ pub mod TribesNftFactory {
     };
     use starknet::syscalls::deploy_syscall;
     use starknet::{
-        ContractAddress, SyscallResultTrait, get_caller_address, get_block_timestamp,
+        ContractAddress, SyscallResultTrait, get_block_timestamp, get_caller_address,
         get_contract_address,
     };
 
@@ -207,7 +207,7 @@ pub mod TribesNftFactory {
                 }
                 collection_arr.append(artist_collections.at(i).read());
                 i += 1;
-            };
+            }
 
             collection_arr
         }
@@ -217,11 +217,9 @@ pub mod TribesNftFactory {
             let mut collections_arr = ArrayTrait::new();
             let stored_collections = self.collections;
 
-            for i in 0
-                ..stored_collections
-                    .len() {
-                        collections_arr.append(self.collections.at(i).read());
-                    };
+            for i in 0..stored_collections.len() {
+                collections_arr.append(self.collections.at(i).read());
+            }
 
             collections_arr
         }
@@ -265,7 +263,7 @@ pub mod TribesNftFactory {
                     taken = true;
                 }
                 i += 1;
-            };
+            }
 
             taken
         }

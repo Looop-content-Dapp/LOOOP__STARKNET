@@ -3,13 +3,12 @@ use starknet::ContractAddress;
 
 #[starknet::contract]
 pub mod MockUsdc {
+    use loop_starknet::interfaces::IExternal;
     use openzeppelin::access::ownable::OwnableComponent;
     use openzeppelin::token::erc20::interface::IERC20Metadata;
     use openzeppelin::token::erc20::{ERC20Component, ERC20HooksEmptyImpl};
-    use loop_starknet::interfaces::IExternal;
     use starknet::ContractAddress;
-
-    use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess,};
+    use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
 
     component!(path: ERC20Component, storage: erc20, event: ERC20Event);
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
@@ -33,7 +32,7 @@ pub mod MockUsdc {
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState, owner: ContractAddress, decimals: u8,) {
+    fn constructor(ref self: ContractState, owner: ContractAddress, decimals: u8) {
         self.erc20.initializer(format!("USDC"), format!("USDC"));
         self.ownable.initializer(owner);
         self.custom_decimals.write(decimals);
