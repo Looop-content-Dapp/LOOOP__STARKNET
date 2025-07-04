@@ -1,3 +1,5 @@
 target
 .snfoundry_cache/
-account0_keystore.json
+snfoundry_trace/
+coverage/
+profile/
